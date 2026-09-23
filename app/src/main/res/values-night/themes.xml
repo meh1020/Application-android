@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.Vista" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/vista_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <color name="vista_background">#0D0D11</color>
+</resources>

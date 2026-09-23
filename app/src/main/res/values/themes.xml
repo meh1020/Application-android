@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.Vista" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/vista_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <color name="vista_background">#F2F4F7</color>
+    <color name="ic_launcher_background">#4A1D6F</color>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "V" de Vista dans un cadre de viseur. Zone sûre : 66dp centrés sur 108dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Coins du viseur -->
+    <path
+        android:strokeColor="#FFB38A"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M34,42 L34,34 L42,34 M66,34 L74,34 L74,42 M74,66 L74,74 L66,74 M42,74 L34,74 L34,66" />
+    <!-- V -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M41,43 L48.5,43 L54,59 L59.5,43 L67,43 L57.5,66 L50.5,66 Z" />
+</vector>
