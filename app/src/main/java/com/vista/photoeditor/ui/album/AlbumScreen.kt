@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Search
@@ -118,6 +119,8 @@ fun AlbumScreen(
     onShare: (List<Uri>) -> Unit,
     onDelete: (List<Uri>) -> Unit,
     memory: AlbumMemory,
+    /** Catégorie automatique : retirer des photos qui n'y ont pas leur place. */
+    onRemoveFromAlbum: ((List<Long>) -> Unit)? = null,
     /** Dernière photo regardée dans la visionneuse, au retour de celle-ci. */
     returnToPhotoId: Long? = null,
     onReturnHandled: () -> Unit = {},
@@ -263,6 +266,9 @@ fun AlbumScreen(
                 count = current.size,
                 onShare = { if (uris.isNotEmpty()) onShare(uris) },
                 onDelete = { if (uris.isNotEmpty()) { onDelete(uris); selection = null } },
+                onRemove = onRemoveFromAlbum?.let { remove ->
+                    { if (current.isNotEmpty()) { remove(current.toList()); selection = null } }
+                },
                 onClose = { selection = null },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -405,7 +411,14 @@ private fun SmallCircle(icon: ImageVector, description: String, selected: Boolea
 }
 
 @Composable
-private fun SelectionBar(count: Int, onShare: () -> Unit, onDelete: () -> Unit, onClose: () -> Unit, modifier: Modifier) {
+private fun SelectionBar(
+    count: Int,
+    onShare: () -> Unit,
+    onDelete: () -> Unit,
+    onRemove: (() -> Unit)?,
+    onClose: () -> Unit,
+    modifier: Modifier,
+) {
     val shape = RoundedCornerShape(32.dp)
     Row(
         modifier
@@ -426,6 +439,11 @@ private fun SelectionBar(count: Int, onShare: () -> Unit, onDelete: () -> Unit, 
                 .weight(1f)
                 .padding(horizontal = 12.dp),
         )
+        if (onRemove != null) {
+            // Retire de la catégorie sans supprimer la photo.
+            CircleIconButton(Icons.Outlined.RemoveCircleOutline, "Retirer de la catégorie", onRemove, size = 44.dp, enabled = count > 0)
+            Spacer(Modifier.width(8.dp))
+        }
         CircleIconButton(Icons.Outlined.IosShare, "Partager", onShare, size = 44.dp, enabled = count > 0)
         Spacer(Modifier.width(8.dp))
         CircleIconButton(Icons.Outlined.Delete, "Supprimer", onDelete, size = 44.dp, selected = count > 0, enabled = count > 0)

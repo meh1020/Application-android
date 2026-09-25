@@ -13,6 +13,7 @@ sealed interface Screen {
     data class Viewer(val albumKey: String, val photoId: Long) : Screen
     data object Editor : Screen
     data object Search : Screen
+    data object Explore : Screen
     data object Trash : Screen
 }
 

@@ -19,7 +19,8 @@
 | Domaine | Ce que Vista propose |
 |---|---|
 | 🖼️ **Galerie** | Parcours par albums animés, grille en quinconce, sélection multiple, tri par date |
-| 🔍 **Recherche intelligente** | Recherche textuelle *et* reconnaissance visuelle hors-ligne (ML Kit) sur 600 photos |
+| 🔍 **Recherche intelligente** | Recherche textuelle *et* reconnaissance visuelle hors-ligne (ML Kit) sur 2 000 photos |
+| 🪄 **Explorer (IA)** | 18 catégories remplies toutes seules par MobileCLIP (Personnes, Plages, Vêtements…) et souvenirs automatiques |
 | ✏️ **Éditeur non destructif** | 13 filtres, 8 réglages fins, recadrage libre ou verrouillé, redressement ±45°, annuler/rétablir |
 | 🚀 **Fluidité 120 Hz** | Adaptation dynamique du mode d'affichage, animations optimisées sans recalcul d'interface |
 | 🌗 **Thème adaptatif** | Clair & sombre (suivi du système), basculement instantané sans redémarrage |
@@ -34,7 +35,24 @@
 Photo plein écran immersive, accroche *« Chaque moment compte »*, bouton **Capturer la vie** qui déclenche la demande de permission d'accès aux médias.
 
 ### 🏠 Accueil
-Pile d'albums animée avec effet de profondeur — touchez une carte arrière ou glissez pour la faire passer au premier plan. Barre de navigation (Accueil / Importer / Corbeille / Créations), bouton **+** d'import et raccourci appareil photo. Fond flouté par Haze pour le *liquid glass*.
+Pile d'albums animée avec effet de profondeur — touchez une carte arrière ou glissez pour la faire passer au premier plan. Barre de navigation (Accueil / Explorer / Corbeille / Créations), bouton **+** d'import et raccourci appareil photo. Fond flouté par Haze pour le *liquid glass*.
+
+### 🪄 Explorer
+La galerie se range toute seule, sans réseau, grâce à **MobileCLIP** (Apple), un modèle qui compare
+chaque photo à des descriptions (« une photo de plage », « une personne vue de dos »…) plutôt que de
+lui coller des étiquettes isolées :
+- **Catégories** — Personnes, Animaux, Plages & mer, Couchers de soleil, Paysages, Fleurs & plantes,
+  Villes & architecture, Nourriture, Vêtements & mode, Appareils & écrans, Véhicules, Bateaux,
+  Documents, Sport, Fêtes & célébrations, Intérieur & maison, Neige & hiver, Art & dessins, plus
+  **Captures d'écran** (d'après l'album système, jamais mélangées aux autres rayons).
+- **Souvenirs** — les photos prises à moins de 20 h d'intervalle forment un moment, nommé d'après
+  la catégorie dominante (« Plage · 15–16 sept. ») ; les dates anniversaires deviennent « Il y a un an ».
+- **Correction à la main** — dans une catégorie, sélectionner des photos puis « Retirer de la
+  catégorie » : elles n'y reviennent plus (la photo elle-même n'est pas supprimée).
+- **Analyse en arrière-plan** dès l'ouverture de l'app (2 000 photos les plus récentes), reprise là
+  où elle s'est arrêtée.
+- Mesuré sur trois jeux (Wikimedia Commons, photos Unsplash au style d'un téléphone, photos de
+  l'émulateur) ; méthode, chiffres et pistes écartées dans `tools/clip/`.
 
 ### 🗂️ Album
 Carte d'en-tête *« Le meilleur de \<mois\> »*, grille en quinconce avec tuiles pré-dimensionnées (zéro reflow), sélection multiple pour partager ou mettre à la corbeille, options de tri.
@@ -77,8 +95,10 @@ app/src/main/java/com/vista/photoeditor/
 ├── data/
 │   ├── MediaRepository.kt       Lecture MediaStore, albums, corbeille, favoris, EXIF
 │   ├── GalleryViewModel.kt      État galerie, rafraîchissement automatique
-│   ├── PhotoLabels.kt           Cache des mots-clés ML Kit par URI
-│   └── SearchIndex.kt           Index de recherche textuelle + contenu visuel
+│   ├── PhotoLabels.kt           Vocabulaire FR des mots-clés ML Kit
+│   ├── ClipModel.kt             MobileCLIP embarqué (ONNX Runtime) et classement par catégorie
+│   ├── SmartAlbums.kt           Catégories et souvenirs
+│   └── SearchIndex.kt           Analyse (mots-clés + vecteurs MobileCLIP), persistance
 ├── editor/
 │   ├── EditState.kt             État immuable de l'édition (filtres + réglages + géométrie)
 │   ├── EditPresets.kt           Définitions des 13 filtres et des 8 curseurs de réglage
@@ -95,6 +115,7 @@ app/src/main/java/com/vista/photoeditor/
     ├── home/                    Pile d'albums animée
     ├── album/                   Grille en quinconce, sélection multiple
     ├── viewer/                  Carrousel 3D, miniatures rondes
+    ├── explore/                 Souvenirs et catégories automatiques
     ├── search/                  Recherche textuelle + IA
     ├── trash/                   Corbeille
     └── editor/                  EditorScreen, panneaux Filtres/Ajuster, CropEditor
@@ -110,6 +131,7 @@ app/src/main/java/com/vista/photoeditor/
 | `dev.chrisbanes.haze:haze:1.2.2` | Flou d'arrière-plan *liquid glass* (Android 12+) |
 | `androidx.exifinterface:exifinterface:1.3.7` | Lecture/écriture métadonnées JPEG (date, GPS, appareil) |
 | `com.google.mlkit:image-labeling:17.0.9` | Reconnaissance visuelle embarquée, hors-ligne |
+| `com.microsoft.onnxruntime:onnxruntime-android:1.30.0` | Exécution de MobileCLIP (catégories) |
 
 ---
 
@@ -145,7 +167,11 @@ app/src/main/java/com/vista/photoeditor/
 
 # Release (minifié + ressources réduites, signé avec la clé debug)
 ./gradlew assembleRelease
-# → app/build/outputs/apk/release/app-release.apk
+# → un APK par processeur, les modèles embarqués livrant une bibliothèque native par architecture :
+#   app-arm64-v8a-release.apk    ~27 Mo  (la grande majorité des téléphones)
+#   app-armeabi-v7a-release.apk  ~26 Mo  (appareils 32 bits)
+#   app-x86_64-release.apk       ~28 Mo  (émulateurs)
+#   app-universal-release.apk    ~60 Mo  (toutes architectures réunies)
 
 # Installer directement sur l'appareil/émulateur connecté
 ./gradlew installDebug
@@ -173,6 +199,8 @@ app/src/main/java/com/vista/photoeditor/
 | Photo d'onboarding | [Unsplash](https://unsplash.com) via picsum.photos — Licence Unsplash |
 | Police **Kanit** | [SIL Open Font License 1.1](https://scripts.sil.org/OFL) |
 | **ML Kit Image Labeling** | [Google ML Kit Terms of Service](https://developers.google.com/ml-kit/terms) |
+| **MobileCLIP-S0** (Apple) | Licence Apple, reproduite dans `app/src/main/assets/clip/LICENSE-MobileCLIP.txt` |
+| **ONNX Runtime** | [MIT](https://github.com/microsoft/onnxruntime/blob/main/LICENSE) |
 | **Haze** par Chris Banes | [Apache 2.0](https://github.com/chrisbanes/haze/blob/main/LICENSE) |
 
 ---

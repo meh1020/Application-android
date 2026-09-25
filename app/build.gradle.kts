@@ -16,11 +16,26 @@ android {
         versionName = "1.0"
     }
 
+    /**
+     * Un APK par type de processeur : les modèles embarqués (reconnaissance d'images et
+     * détection de visages) livrent une bibliothèque native par architecture, et un téléphone
+     * n'en utilise qu'une. L'APK universel reste produit pour les cas où l'on ne sait pas
+     * à l'avance sur quel appareil installer.
+     */
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Signé avec la clé debug pour pouvoir installer l'APK release directement.
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -37,6 +52,14 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+
+    packaging {
+        jniLibs {
+            // Bibliothèques natives compressées dans l'APK : le fichier à installer passe
+            // d'environ 44 à 27 Mo (moteur ONNX et ML Kit). Android les décompresse à l'installation.
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -61,4 +84,6 @@ dependencies {
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     // Reconnaissance d'images embarquée, pour la recherche par contenu hors ligne.
     implementation("com.google.mlkit:image-labeling:17.0.9")
+    // Compréhension d'image (MobileCLIP) pour ranger les photos par catégorie.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
 }

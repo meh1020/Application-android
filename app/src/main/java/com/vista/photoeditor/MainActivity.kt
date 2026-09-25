@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import com.vista.photoeditor.data.GalleryViewModel
 import com.vista.photoeditor.data.MediaPermissions
 import com.vista.photoeditor.data.MediaRepository
+import com.vista.photoeditor.data.SmartAlbums
 import com.vista.photoeditor.editor.EditorViewModel
 import com.vista.photoeditor.editor.ImageIO
 import com.vista.photoeditor.ui.Navigator
@@ -54,6 +55,7 @@ import com.vista.photoeditor.ui.components.GlassScope
 import com.vista.photoeditor.ui.components.LocalNavAnimatedVisibilityScope
 import com.vista.photoeditor.ui.components.LocalSharedTransitionScope
 import com.vista.photoeditor.ui.editor.EditorScreen
+import com.vista.photoeditor.ui.explore.ExploreScreen
 import com.vista.photoeditor.ui.home.HomeScreen
 import com.vista.photoeditor.ui.onboarding.OnboardingScreen
 import com.vista.photoeditor.ui.search.SearchScreen
@@ -250,6 +252,7 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 onTabChange = { homeTab = it },
                 onOpenAlbum = { navigator.push(Screen.AlbumDetail(it)) },
                 onSearch = { navigator.push(Screen.Search) },
+                onExplore = { navigator.push(Screen.Explore) },
                 onImport = importPhoto,
                 onCamera = takePhoto,
                 onTrash = { navigator.push(Screen.Trash) },
@@ -279,6 +282,9 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 onShare = share,
                 onDelete = { launchRequest(MediaRepository.trashRequest(context, it, trash = true)) },
                 memory = albumMemories.getOrPut(screen.albumKey) { AlbumMemory() },
+                onRemoveFromAlbum = if (screen.albumKey.startsWith(SmartAlbums.CATEGORY_PREFIX)) {
+                    { ids -> gallery.removeFromCategory(screen.albumKey, ids) }
+                } else null,
                 returnToPhotoId = lastViewedPhoto[screen.albumKey],
                 onReturnHandled = { lastViewedPhoto.remove(screen.albumKey) },
             )
@@ -304,6 +310,12 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 onBack = { navigator.pop() },
                 onOpenAlbum = { navigator.push(Screen.AlbumDetail(it)) },
                 onOpenPhoto = { navigator.push(Screen.Viewer(MediaRepository.ALL_KEY, it)) },
+            )
+
+            Screen.Explore -> ExploreScreen(
+                gallery = gallery,
+                onBack = { navigator.pop() },
+                onOpenAlbum = { navigator.push(Screen.AlbumDetail(it)) },
             )
 
             Screen.Trash -> TrashScreen(

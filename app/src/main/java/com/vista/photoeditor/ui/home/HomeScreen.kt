@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddAPhoto
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.IosShare
@@ -93,6 +94,7 @@ fun HomeScreen(
     onOpenAlbum: (String) -> Unit,
     onSearch: () -> Unit,
     onImport: () -> Unit,
+    onExplore: () -> Unit,
     onCamera: () -> Unit,
     onTrash: () -> Unit,
     onCreations: () -> Unit,
@@ -118,7 +120,7 @@ fun HomeScreen(
         BottomNav(
             selectedTab = selectedTab,
             onTabChange = onTabChange,
-            onImport = onImport,
+            onExplore = onExplore,
             onTrash = onTrash,
             onCreations = onCreations,
             onCamera = onCamera,
@@ -429,7 +431,7 @@ private fun MessageCard(title: String, body: String, action: String, onAction: (
 private fun BottomNav(
     selectedTab: Int,
     onTabChange: (Int) -> Unit,
-    onImport: () -> Unit,
+    onExplore: () -> Unit,
     onTrash: () -> Unit,
     onCreations: () -> Unit,
     onCamera: () -> Unit,
@@ -438,7 +440,7 @@ private fun BottomNav(
     val items = remember {
         listOf(
             GlassBarItem(Icons.Outlined.Home, "Accueil"),
-            GlassBarItem(Icons.Outlined.SaveAlt, "Importer"),
+            GlassBarItem(Icons.Outlined.AutoAwesome, "Explorer"),
             GlassBarItem(Icons.Outlined.Delete, "Corbeille"),
             GlassBarItem(Icons.Outlined.IosShare, "Créations"),
         )
@@ -458,7 +460,7 @@ private fun BottomNav(
             onSelect = { index ->
                 onTabChange(index)
                 when (index) {
-                    1 -> onImport()
+                    1 -> onExplore()
                     2 -> onTrash()
                     3 -> onCreations()
                 }

@@ -7,3 +7,12 @@ build/
 captures/
 .externalNativeBuild/
 .cxx/
+
+# Données et modèles des outils de classement (volumineux, retéléchargeables)
+tools/clip/data/
+tools/clip/*.onnx
+tools/clip/tokenizer.json
+tools/clip/*.npz
+tools/clip/text_cache.json
+tools/clip/variants/
+__pycache__/
