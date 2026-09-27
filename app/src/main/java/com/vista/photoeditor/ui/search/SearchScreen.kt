@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -57,6 +58,8 @@ import com.vista.photoeditor.ui.components.sharedPhoto
 import com.vista.photoeditor.ui.components.softShadow
 import com.vista.photoeditor.ui.theme.Kanit
 import com.vista.photoeditor.ui.theme.VistaColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 @Composable
@@ -68,24 +71,44 @@ fun SearchScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val index = gallery.searchIndex
-    // L'analyse démarre à l'ouverture de la recherche et reprend là où elle s'était arrêtée.
+    // L'analyse démarre avec l'app ; si elle n'est pas finie, la recherche la reprend là où elle en est.
     LaunchedEffect(gallery.photos) { index.ensureIndexed(gallery.photos) }
 
     val q = PhotoLabels.normalize(query)
     val albums = remember(q, gallery.albums) {
         if (q.isEmpty()) gallery.albums else gallery.albums.filter { PhotoLabels.normalize(it.name).contains(q) }
     }
-    val photos = remember(q, gallery.photos, index.indexed) {
-        if (q.isEmpty()) gallery.photos.take(60)
-        else gallery.photos.filter { p ->
-            PhotoLabels.normalize(p.name).contains(q) ||
-                PhotoLabels.normalize(p.bucketName).contains(q) ||
-                PhotoLabels.normalize(DateLabels.day(p.dateMillis)).contains(q) ||
-                PhotoLabels.normalize(DateLabels.month(p.dateMillis)).contains(q) ||
-                index.matches(p.id, q)
+    // Calculés hors du fil de l'interface : comparer des milliers de photos au vocabulaire ne doit
+    // pas figer la saisie.
+    val photos by produceState(gallery.photos.take(60), q, gallery.photos, index.version) {
+        value = if (q.isEmpty()) gallery.photos.take(60) else withContext(Dispatchers.Default) {
+            val concepts = index.conceptsFor(q)
+            // Le contenu d'abord, du plus ressemblant au moins ressemblant ; puis nom, album ou date.
+            val byContent = gallery.photos
+                .mapNotNull { p -> index.relevance(p.id, concepts)?.let { p to it } }
+                .sortedByDescending { it.second }
+                .map { it.first }
+            val seen = byContent.mapTo(HashSet()) { it.id }
+            // Puis les photos de la catégorie d'Explorer que désigne la recherche (« livre » →
+            // « Livres & lecture ») : la recherche retrouve au moins ce qu'Explorer montre, retraits
+            // manuels compris.
+            val byCategory = gallery.categories()
+                .filter { PhotoLabels.isMainSubject(it.name, q) }
+                .flatMap { it.photos }
+                .filter { seen.add(it.id) }
+            byContent + byCategory + gallery.photos.filter { p ->
+                p.id !in seen && (
+                    PhotoLabels.normalize(p.name).contains(q) ||
+                        PhotoLabels.normalize(p.bucketName).contains(q) ||
+                        PhotoLabels.normalize(DateLabels.day(p.dateMillis)).contains(q) ||
+                        PhotoLabels.normalize(DateLabels.month(p.dateMillis)).contains(q)
+                    )
+            }
         }
     }
-    val suggestions = remember(gallery.photos, index.indexed) { index.suggestions(gallery.photos) }
+    val suggestions by produceState(emptyList<String>(), gallery.photos, index.version) {
+        value = withContext(Dispatchers.Default) { index.suggestions(gallery.photos) }
+    }
 
     Column(
         Modifier

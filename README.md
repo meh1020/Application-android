@@ -19,8 +19,8 @@
 | Domaine | Ce que Vista propose |
 |---|---|
 | 🖼️ **Galerie** | Parcours par albums animés, grille en quinconce, sélection multiple, tri par date |
-| 🔍 **Recherche intelligente** | Recherche textuelle *et* reconnaissance visuelle hors-ligne (ML Kit) sur 2 000 photos |
-| 🪄 **Explorer (IA)** | 18 catégories remplies toutes seules par MobileCLIP (Personnes, Plages, Vêtements…) et souvenirs automatiques |
+| 🔍 **Recherche intelligente** | Par nom, album, date *ou* contenu (« robe », « chien », « coucher de soleil »), hors ligne, sur 2 000 photos |
+| 🪄 **Explorer (IA)** | 19 catégories remplies toutes seules par MobileCLIP (Personnes, Plages, Vêtements…) et souvenirs automatiques |
 | ✏️ **Éditeur non destructif** | 13 filtres, 8 réglages fins, recadrage libre ou verrouillé, redressement ±45°, annuler/rétablir |
 | 🚀 **Fluidité 120 Hz** | Adaptation dynamique du mode d'affichage, animations optimisées sans recalcul d'interface |
 | 🌗 **Thème adaptatif** | Clair & sombre (suivi du système), basculement instantané sans redémarrage |
@@ -43,7 +43,8 @@ chaque photo à des descriptions (« une photo de plage », « une personne vue 
 lui coller des étiquettes isolées :
 - **Catégories** — Personnes, Animaux, Plages & mer, Couchers de soleil, Paysages, Fleurs & plantes,
   Villes & architecture, Nourriture, Vêtements & mode, Appareils & écrans, Véhicules, Bateaux,
-  Documents, Sport, Fêtes & célébrations, Intérieur & maison, Neige & hiver, Art & dessins, plus
+  Documents, Livres & lecture, Sport, Fêtes & célébrations, Intérieur & maison, Neige & hiver,
+  Art & dessins, plus
   **Captures d'écran** (d'après l'album système, jamais mélangées aux autres rayons).
 - **Souvenirs** — les photos prises à moins de 20 h d'intervalle forment un moment, nommé d'après
   la catégorie dominante (« Plage · 15–16 sept. ») ; les dates anniversaires deviennent « Il y a un an ».
@@ -67,7 +68,11 @@ Carrousel 3D avec photos voisines floutées et décalées en perspective, pannea
 - **Comparer** — Maintenir l'image pour afficher l'original côte à côte.
 
 ### 🔍 Recherche
-Barre de recherche avec suggestions en pastilles des mots-clés les plus fréquents. Recherche par nom d'album, mois, date, nom de fichier **ou** contenu visuel (« chien », « plage », « montagne »…). L'analyse ML reprend là où elle s'est arrêtée.
+Barre de recherche avec, en pastilles, les sujets les plus fréquents de vos photos. Recherche par nom d'album, mois, date, nom de fichier **ou** contenu (« chien », « robe », « coucher de soleil »…) : environ 380 concepts nommés en français, reconnus par MobileCLIP à partir des vecteurs déjà calculés pour les catégories. Les photos trouvées par leur contenu viennent en tête, de la plus ressemblante à la moins ressemblante.
+
+Les recherches au pluriel fonctionnent (« livres »), et une recherche qui désigne une catégorie d'Explorer (« livre », « plage », « fleurs ») ramène aussi ses photos.
+
+Mesurée sur les mêmes 676 photos et 57 requêtes que l'ancienne recherche par mots-clés ML Kit : précision 84 % contre 77 %, deux fois plus de photos retrouvées (rappel 65 % contre 33 %), 63 intrus contre 285.
 
 ### 🗑️ Corbeille
 Galerie des éléments supprimés avec options **Restaurer** ou **Supprimer définitivement**.
@@ -95,7 +100,7 @@ app/src/main/java/com/vista/photoeditor/
 ├── data/
 │   ├── MediaRepository.kt       Lecture MediaStore, albums, corbeille, favoris, EXIF
 │   ├── GalleryViewModel.kt      État galerie, rafraîchissement automatique
-│   ├── PhotoLabels.kt           Vocabulaire FR des mots-clés ML Kit
+│   ├── PhotoLabels.kt           Normalisation des textes de recherche (minuscules, sans accents)
 │   ├── ClipModel.kt             MobileCLIP embarqué (ONNX Runtime) et classement par catégorie
 │   ├── SmartAlbums.kt           Catégories et souvenirs
 │   └── SearchIndex.kt           Analyse (mots-clés + vecteurs MobileCLIP), persistance
@@ -130,7 +135,6 @@ app/src/main/java/com/vista/photoeditor/
 | `io.coil-kt.coil3:coil-compose:3.0.4` | Chargement & mise en cache asynchrone des images |
 | `dev.chrisbanes.haze:haze:1.2.2` | Flou d'arrière-plan *liquid glass* (Android 12+) |
 | `androidx.exifinterface:exifinterface:1.3.7` | Lecture/écriture métadonnées JPEG (date, GPS, appareil) |
-| `com.google.mlkit:image-labeling:17.0.9` | Reconnaissance visuelle embarquée, hors-ligne |
 | `com.microsoft.onnxruntime:onnxruntime-android:1.30.0` | Exécution de MobileCLIP (catégories) |
 
 ---
@@ -168,10 +172,10 @@ app/src/main/java/com/vista/photoeditor/
 # Release (minifié + ressources réduites, signé avec la clé debug)
 ./gradlew assembleRelease
 # → un APK par processeur, les modèles embarqués livrant une bibliothèque native par architecture :
-#   app-arm64-v8a-release.apk    ~27 Mo  (la grande majorité des téléphones)
-#   app-armeabi-v7a-release.apk  ~26 Mo  (appareils 32 bits)
-#   app-x86_64-release.apk       ~28 Mo  (émulateurs)
-#   app-universal-release.apk    ~60 Mo  (toutes architectures réunies)
+#   app-arm64-v8a-release.apk    ~20 Mo  (la grande majorité des téléphones)
+#   app-armeabi-v7a-release.apk  ~20 Mo  (appareils 32 bits)
+#   app-x86_64-release.apk       ~21 Mo  (émulateurs)
+#   app-universal-release.apk    ~41 Mo  (toutes architectures réunies)
 
 # Installer directement sur l'appareil/émulateur connecté
 ./gradlew installDebug
@@ -198,7 +202,6 @@ app/src/main/java/com/vista/photoeditor/
 |---|---|
 | Photo d'onboarding | [Unsplash](https://unsplash.com) via picsum.photos — Licence Unsplash |
 | Police **Kanit** | [SIL Open Font License 1.1](https://scripts.sil.org/OFL) |
-| **ML Kit Image Labeling** | [Google ML Kit Terms of Service](https://developers.google.com/ml-kit/terms) |
 | **MobileCLIP-S0** (Apple) | Licence Apple, reproduite dans `app/src/main/assets/clip/LICENSE-MobileCLIP.txt` |
 | **ONNX Runtime** | [MIT](https://github.com/microsoft/onnxruntime/blob/main/LICENSE) |
 | **Haze** par Chris Banes | [Apache 2.0](https://github.com/chrisbanes/haze/blob/main/LICENSE) |

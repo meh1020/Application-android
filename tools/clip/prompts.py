@@ -61,6 +61,10 @@ CATEGORIES = {
     "party": (u"Fêtes & célébrations", [
         "a birthday party", "fireworks in the sky", "a wedding celebration", "a concert",
     ]),
+    "books": (u"Livres & lecture", [
+        "a photo of a book", "a stack of books", "a bookshelf full of books", "an open book",
+        "a person reading a book", "books in a library", "a book cover",
+    ]),
     "home": (u"Intérieur & maison", [
         "a photo of a living room", "a bedroom interior", "a kitchen", "a home interior",
     ]),
@@ -81,7 +85,7 @@ BACKGROUND = [
 
 # Doubles appartenances légitimes : pas une erreur si la photo apparaît aussi dans ces rayons.
 COMPATIBLE = {
-    "people": {"fashion", "sport", "party", "beach", "city", "snow", "art"},
+    "people": {"fashion", "sport", "party", "beach", "city", "snow", "art", "books"},
     "animals": {"landscape", "snow", "home", "beach"},
     "beach": {"sunset", "boats", "landscape", "people"},
     "sunset": {"beach", "boats", "landscape", "city", "snow"},
@@ -93,12 +97,13 @@ COMPATIBLE = {
     "electronics": {"documents"},
     "vehicles": {"city", "boats", "landscape", "sport", "snow"},
     "boats": {"beach", "sunset", "landscape", "city", "vehicles"},
-    "documents": {"electronics", "art"},
+    "documents": {"electronics", "art", "books"},
     "sport": {"people", "snow", "landscape", "city"},
     "party": {"people", "food", "city", "sunset"},
-    "home": {"art", "food", "flowers"},
+    "home": {"art", "food", "flowers", "books"},
     "snow": {"landscape", "sport", "city"},
-    "art": {"city", "people", "documents", "home", "animals", "flowers"},
+    "art": {"city", "people", "documents", "home", "animals", "flowers", "books"},
+    "books": {"documents", "home", "people", "art", "city"},
 }
 
 # Nom d'un souvenir où la catégorie domine ; les catégories absentes ne nomment pas de souvenir.
@@ -106,7 +111,7 @@ MEMORY_NAMES = {
     "beach": u"Plage", "sunset": u"Coucher de soleil", "landscape": u"Nature",
     "flowers": u"Fleurs", "city": u"En ville", "food": u"Repas", "party": u"Fête",
     "snow": u"Neige", "boats": u"En bateau", "sport": u"Sport", "animals": u"Animaux",
-    "home": u"À la maison",
+    "home": u"À la maison", "books": u"Lecture",
 }
 
 # Réglages de décision. Seuils globaux réglés sur l'entraînement Commons ; seuils propres à

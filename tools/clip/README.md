@@ -7,6 +7,7 @@ produisent les deux fichiers livrés dans l'app, sous `app/src/main/assets/clip/
 |---|---|
 | `vision.onnx` (11 Mo) | encodeur d'images MobileCLIP-S0 (Apple), poids compressés en int8 |
 | `classes.bin` | descriptions des catégories encodées, seuils de chaque catégorie, titres français |
+| `concepts.bin` (0,8 Mo) | vocabulaire de la recherche : concepts encodés et leurs termes français |
 
 ## Principe retenu
 
@@ -22,7 +23,7 @@ produisent les deux fichiers livrés dans l'app, sous `app/src/main/assets/clip/
 
 | Jeu | Contenu | Usage |
 |---|---|---|
-| Commons (`dataset.py`) | 2 652 photos d'entraînement, 676 de test triées à la main | réglage global, mesure |
+| Commons (`dataset.py`) | 2 953 photos d'entraînement, 730 de test triées à la main | réglage global, mesure |
 | Unsplash (`unsplash.py`) | 240 photos au style d'une galerie de téléphone, étiquetées à la main (catégories attendues / tolérées) | choix entre méthodes, par moitiés |
 | Émulateur (`data/phone/`) | 32 photos avec les vecteurs calculés **par le téléphone** | contrôle final, parité téléphone / ordinateur |
 
@@ -58,6 +59,58 @@ python weight_quant.py vision_model_op17.onnx vision_wq8.onnx
 ```
 
 Données, modèles et variantes restent hors de git (`.gitignore`).
+
+## Catégorie « Livres & lecture » (ajoutée ensuite)
+
+Avant : sur 54 photos de livres (test Commons trié à la main), 27 n'étaient rangées nulle part et
+13 partaient en « Documents ». Après ajout de la catégorie (sources Books, Open books, Stacks of
+books, Bookshelves, Libraries, People reading…), mesure sur les mêmes photos :
+
+| | Livres trouvés | Intrus « Livres » | Documents (trouvés / intrus / oubliés) |
+|---|---|---|---|
+| Commons test | 43 / 54 | 0 | 18 / 0 / 1 (avant : 19 / 1 / 0) |
+| Unsplash | 2 / 2 | 1 (une nef d'église) | — |
+
+Effet de bord : « Personnes » perd 4 photos sur Commons (des gens qui lisent, rangés en « Livres »
+seulement). Seuils par défaut conservés : un réglage propre, appris sur l'entraînement, ajoutait un
+intrus sans rien trouver de plus. Deux photos Unsplash montrant des livres ont été étiquetées
+« Livres » et quatre ambiguës l'ont en toléré.
+
+## Recherche par contenu
+
+Même vecteur MobileCLIP que pour les catégories, comparé à environ 380 concepts (`concepts.py`) :
+le dictionnaire hérité de ML Kit (`vocabulary.json`, termes français sans accents), des concepts
+courants dans une galerie de téléphone (téléphone, tablette, guitare, diplôme…) et quelques
+synonymes qui se volaient la place (« neige » aussi pour « hiver », « canoë » et « kayak »). Une
+photo correspond à une recherche quand l'un des concepts désignés est, de tout le vocabulaire,
+celui qui la décrit le mieux. `python concepts.py --export` écrit `assets/clip/concepts.bin`.
+
+Mesure (`search_eval.py`) : les 676 photos de test copiées dans la galerie de l'émulateur, analysées
+par l'app (mots-clés ML Kit et vecteurs MobileCLIP réellement calculés par le téléphone), 57
+requêtes françaises dont les sources Commons donnent la vérité.
+
+| Recherche | Précision | Rappel | Intrus | Oublis |
+|---|---|---|---|---|
+| Mots-clés ML Kit (précédente) | 77 % | 33 % | 285 | 326 |
+| MobileCLIP | 84 % | 63 % | 53 | 209 |
+| MobileCLIP + pluriel + catégories (actuelle) | 84 % | 65 % | 63 | 180 |
+
+Ajouts ensuite : les recherches au pluriel (« livres ») trouvent ce qui est nommé au singulier, et
+une recherche qui désigne le **sujet principal** d'une catégorie d'Explorer (« livre », « plage »,
+« fleurs », « neige ») ramène aussi les photos de cette catégorie, retraits manuels compris. Pas les
+sujets secondaires : « dessin » ne ramène pas « Art & dessins », qui ajoutait 7 intrus (tableaux,
+graffitis). Les 10 intrus de plus viennent surtout de « neige », dont la moitié montre réellement
+de la neige mais hors des sources prévues. Pour les livres (54 photos de test) : « livre » trouvait
+22 photos et « livres » aucune ; tous deux en trouvent maintenant 50, pour 1 intrus.
+
+La recherche précédente cherchait la requête *à l'intérieur* des mots (« clé » ramenait 94 intrus :
+bicy*cle*tte…) ; la nouvelle compare le *début* des mots. Règle plus souple essayée (concept
+premier, ou deuxième nettement au-dessus de sa moyenne) : +5 points de rappel mais 27 intrus de
+plus, écartée. Les synonymes ont été choisis en voyant les échecs du test.
+
+Pour refaire la mesure : copier `data/push_test/` (photos de test) dans `Pictures/VistaEval` de
+l'émulateur, lancer l'app de développement, puis récupérer dans `data/phone_eval/` le fichier
+`photo-clip-v1.bin` et la liste `_id` / `_display_name` de MediaStore.
 
 ## Essayé et écarté (mesures à l'appui)
 

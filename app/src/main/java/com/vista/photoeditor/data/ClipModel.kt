@@ -44,6 +44,11 @@ class ClipModel(private val context: Context) {
         DataInputStream(context.assets.open(CLASSES_ASSET).buffered()).use { ClipClasses.read(it) }
     }
 
+    /** Vocabulaire de la recherche par contenu (« chien », « robe »…), livré avec l'app. */
+    val concepts: ClipConcepts by lazy {
+        DataInputStream(context.assets.open(CONCEPTS_ASSET).buffered()).use { ClipConcepts.read(it) }
+    }
+
     /** Vecteur de la photo, de norme 1. [bitmap] doit être à l'endroit (rotation EXIF appliquée). */
     fun embed(bitmap: Bitmap): FloatArray {
         val input = OnnxTensor.createTensor(env, pixels(bitmap), longArrayOf(1, 3, SIZE.toLong(), SIZE.toLong()))
@@ -86,6 +91,7 @@ class ClipModel(private val context: Context) {
     companion object {
         const val MODEL_ASSET = "clip/vision.onnx"
         const val CLASSES_ASSET = "clip/classes.bin"
+        const val CONCEPTS_ASSET = "clip/concepts.bin"
         private const val INPUT = "pixel_values"
         private const val SIZE = 256
 
@@ -174,6 +180,70 @@ class ClipClasses(
                 FloatArray(dim) { input.readFloat() }
             }
             return ClipClasses(keys, titles, memoryNames, vectors, scale, primary, secondary)
+        }
+    }
+}
+
+/**
+ * Vocabulaire de la recherche : environ 380 concepts décrits en anglais pour MobileCLIP (vecteurs
+ * encodés sur ordinateur, voir `tools/clip/concepts.py`) et nommés en français pour la recherche.
+ */
+class ClipConcepts(
+    private val displayNames: List<String>,
+    /** Termes français de chaque concept, sans accents ni majuscules. */
+    private val terms: List<List<String>>,
+    private val vectors: Array<FloatArray>,
+) {
+    /** Concept qui décrit le mieux une photo, et sa similarité. */
+    class Best(val index: Int, val score: Float)
+
+    fun best(embedding: FloatArray): Best {
+        var bestIndex = 0
+        var bestScore = Float.NEGATIVE_INFINITY
+        for (c in vectors.indices) {
+            val v = vectors[c]
+            var dot = 0f
+            for (d in v.indices) dot += v[d] * embedding[d]
+            if (dot > bestScore) { bestScore = dot; bestIndex = c }
+        }
+        return Best(bestIndex, bestScore)
+    }
+
+    /**
+     * Concepts dont un terme commence par la requête : « chien » désigne le chien et les races de
+     * chiens, « robe » la robe et la robe de soirée. Le début du mot seulement : chercher « clé » ne
+     * doit pas ramener les « bicyclettes ».
+     */
+    fun matching(normalizedQuery: String): Set<Int> {
+        // « livres » doit trouver ce qui est nommé « livre ».
+        val singular = PhotoLabels.singular(normalizedQuery)
+        return terms.indices.filterTo(mutableSetOf()) { c ->
+            terms[c].any { it.startsWith(normalizedQuery) || it.startsWith(singular) }
+        }
+    }
+
+    fun displayName(index: Int): String = displayNames[index]
+
+    companion object {
+        private const val FORMAT_VERSION = 2
+
+        /**
+         * Format (gros-boutiste) : version, n, dim, puis n × (clé, nom affiché, termes séparés
+         * par « | », vecteur[dim]).
+         */
+        fun read(input: DataInputStream): ClipConcepts {
+            check(input.readInt() == FORMAT_VERSION) { "concepts.bin : format inattendu" }
+            val count = input.readInt()
+            val dim = input.readInt()
+            val names = ArrayList<String>(count)
+            val terms = ArrayList<List<String>>(count)
+            val vectors = Array(count) {
+                input.readUTF() // clé anglaise : utile aux outils seulement
+                names += input.readUTF()
+                terms += input.readUTF().split('|').filter { it.isNotEmpty() }
+                FloatArray(dim) { input.readFloat() }
+            }
+            return ClipConcepts(names, terms, vectors)
         }
     }
 }

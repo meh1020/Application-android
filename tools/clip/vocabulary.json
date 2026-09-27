@@ -1,0 +1,1114 @@
+{
+"Aircraft": [
+"aeronef",
+"avion"
+],
+"Airliner": [
+"avion de ligne",
+"avion"
+],
+"Airplane": [
+"avion"
+],
+"Alcohol": [
+"alcool"
+],
+"Animal": [
+"animal"
+],
+"Aquarium": [
+"aquarium"
+],
+"Archery": [
+"tir a l'arc"
+],
+"Art": [
+"art",
+"oeuvre",
+"tableau"
+],
+"Aurora": [
+"aurore boreale"
+],
+"Baby": [
+"bebe"
+],
+"Backpacking": [
+"randonnee",
+"sac a dos"
+],
+"Badminton": [
+"badminton"
+],
+"Bag": [
+"sac"
+],
+"Ball": [
+"ballon",
+"balle"
+],
+"Balloon": [
+"ballon",
+"montgolfiere"
+],
+"Ballroom": [
+"salle de bal"
+],
+"Bangle": [
+"bracelet"
+],
+"Barn": [
+"grange"
+],
+"Basset hound": [
+"basset",
+"chien"
+],
+"Bathroom": [
+"salle de bain"
+],
+"Beach": [
+"plage",
+"mer",
+"sable"
+],
+"Beanie": [
+"bonnet"
+],
+"Bear": [
+"ours"
+],
+"Beard": [
+"barbe"
+],
+"Bedroom": [
+"chambre"
+],
+"Bento": [
+"bento"
+],
+"Bicycle": [
+"velo",
+"bicyclette"
+],
+"Bird": [
+"oiseau"
+],
+"Blackboard": [
+"tableau noir"
+],
+"Blazer": [
+"veste",
+"blazer"
+],
+"Boat": [
+"bateau",
+"barque"
+],
+"Bonfire": [
+"feu de camp"
+],
+"Book": [
+"livre"
+],
+"Boxer": [
+"boxer",
+"chien"
+],
+"Bracelet": [
+"bracelet"
+],
+"Bread": [
+"pain"
+],
+"Bride": [
+"mariee"
+],
+"Bridge": [
+"pont"
+],
+"Brig": [
+"brick",
+"voilier"
+],
+"Building": [
+"batiment",
+"immeuble"
+],
+"Bull": [
+"taureau"
+],
+"Bullfighting": [
+"corrida"
+],
+"Bunk bed": [
+"lit superpose"
+],
+"Bus": [
+"bus",
+"autobus"
+],
+"Butterfly": [
+"papillon"
+],
+"Cabinetry": [
+"placard",
+"meuble"
+],
+"Cairn terrier": [
+"terrier",
+"chien"
+],
+"Cake": [
+"gateau"
+],
+"Candle": [
+"bougie"
+],
+"Canoe": [
+"canoe"
+],
+"Canyon": [
+"canyon",
+"gorge"
+],
+"Cap": [
+"casquette"
+],
+"Cappuccino": [
+"cappuccino",
+"cafe"
+],
+"Car": [
+"voiture",
+"auto"
+],
+"Carnival": [
+"carnaval"
+],
+"Casino": [
+"casino"
+],
+"Castle": [
+"chateau"
+],
+"Cat": [
+"chat"
+],
+"Cathedral": [
+"cathedrale"
+],
+"Cattle": [
+"vache",
+"betail"
+],
+"Cavalier": [
+"cavalier king charles",
+"chien"
+],
+"Cave": [
+"grotte"
+],
+"Caving": [
+"speleologie"
+],
+"Chair": [
+"chaise"
+],
+"Cheeseburger": [
+"burger"
+],
+"Child": [
+"enfant"
+],
+"Christmas": [
+"noel"
+],
+"Church": [
+"eglise"
+],
+"Circus": [
+"cirque"
+],
+"City": [
+"ville"
+],
+"Cliff": [
+"falaise"
+],
+"Clipper": [
+"clipper",
+"voilier"
+],
+"Cloud": [
+"nuage",
+"ciel"
+],
+"Clown": [
+"clown"
+],
+"Coast": [
+"cote",
+"littoral"
+],
+"Coffee": [
+"cafe"
+],
+"Cola": [
+"soda",
+"cola"
+],
+"Comet": [
+"comete"
+],
+"Comics": [
+"bande dessinee",
+"bd"
+],
+"Concert": [
+"concert"
+],
+"Cookie": [
+"biscuit"
+],
+"Cool": [
+"frais"
+],
+"Costume": [
+"costume",
+"deguisement"
+],
+"Couch": [
+"canape"
+],
+"Countertop": [
+"plan de travail"
+],
+"Couscous": [
+"couscous"
+],
+"Crocodile": [
+"crocodile"
+],
+"Crowd": [
+"foule",
+"gens"
+],
+"Cuisine": [
+"cuisine",
+"plat"
+],
+"Curling": [
+"curling"
+],
+"Curtain": [
+"rideau"
+],
+"Cushion": [
+"coussin"
+],
+"Cycling": [
+"cyclisme",
+"velo"
+],
+"Dalmatian": [
+"dalmatien",
+"chien"
+],
+"Dance": [
+"danse"
+],
+"Deejay": [
+"dj"
+],
+"Desert": [
+"desert"
+],
+"Desk": [
+"bureau"
+],
+"Dessert": [
+"dessert",
+"gateau"
+],
+"Dinosaur": [
+"dinosaure"
+],
+"Diwali": [
+"diwali"
+],
+"Dog": [
+"chien"
+],
+"Doll": [
+"poupee"
+],
+"Drawer": [
+"tiroir"
+],
+"Dress": [
+"robe"
+],
+"Drink": [
+"boisson",
+"verre"
+],
+"Duck": [
+"canard"
+],
+"Dude": [
+"type",
+"mec"
+],
+"Dune": [
+"dune"
+],
+"Eating": [
+"repas",
+"manger"
+],
+"Face": [
+"portrait",
+"visage",
+"personne",
+"gens"
+],
+"Factory": [
+"usine"
+],
+"Fashion": [
+"mode",
+"vetement"
+],
+"Fast food": [
+"fast-food"
+],
+"Ferris wheel": [
+"grande roue"
+],
+"Field": [
+"champ"
+],
+"Fireworks": [
+"feu d'artifice"
+],
+"Fishing": [
+"peche"
+],
+"Flora": [
+"flore",
+"vegetation"
+],
+"Flower": [
+"fleur"
+],
+"Flowerpot": [
+"pot de fleurs"
+],
+"Food": [
+"nourriture",
+"plat",
+"repas"
+],
+"Forest": [
+"foret",
+"bois"
+],
+"Frigate": [
+"fregate",
+"navire"
+],
+"Fruit": [
+"fruit"
+],
+"Fun": [
+"fete",
+"amusement"
+],
+"Furniture": [
+"meuble"
+],
+"Garden": [
+"jardin"
+],
+"Gelato": [
+"glace"
+],
+"Gerbil": [
+"gerbille",
+"rongeur"
+],
+"Glacier": [
+"glacier"
+],
+"Glasses": [
+"lunettes"
+],
+"Gown": [
+"robe de soiree"
+],
+"Graduation": [
+"remise de diplome"
+],
+"Grandparent": [
+"grand-parent",
+"papi",
+"mamie"
+],
+"Grass": [
+"herbe",
+"pelouse"
+],
+"Groom": [
+"marie"
+],
+"Gymnastics": [
+"gymnastique"
+],
+"Handbag": [
+"sac a main"
+],
+"Hanukkah": [
+"hanouka"
+],
+"Hat": [
+"chapeau",
+"bonnet"
+],
+"Helicopter": [
+"helicoptere"
+],
+"Herd": [
+"troupeau"
+],
+"Hiking": [
+"randonnee"
+],
+"Himalayan": [
+"himalayen",
+"chat"
+],
+"Horse": [
+"cheval"
+],
+"Hot dog": [
+"hot-dog"
+],
+"House": [
+"maison"
+],
+"Human": [
+"personne",
+"gens"
+],
+"Ice": [
+"glace"
+],
+"Iceberg": [
+"iceberg"
+],
+"Insect": [
+"insecte"
+],
+"Jacket": [
+"veste",
+"blouson"
+],
+"Jeans": [
+"jean"
+],
+"Jersey": [
+"maillot"
+],
+"Jewellery": [
+"bijou"
+],
+"Juice": [
+"jus"
+],
+"Jungle": [
+"jungle"
+],
+"Kayak": [
+"kayak"
+],
+"Kitchen": [
+"cuisine"
+],
+"Lake": [
+"lac"
+],
+"Lampshade": [
+"abat-jour",
+"lampe"
+],
+"Laptop": [
+"ordinateur",
+"portable"
+],
+"Larva": [
+"larve",
+"chenille"
+],
+"Laugh": [
+"rire"
+],
+"Laundry": [
+"linge",
+"lessive"
+],
+"Leaf": [
+"feuille"
+],
+"Leggings": [
+"legging"
+],
+"Lego": [
+"lego"
+],
+"Lighthouse": [
+"phare"
+],
+"Loveseat": [
+"causeuse",
+"canape"
+],
+"Lunch": [
+"dejeuner"
+],
+"Marathon": [
+"marathon"
+],
+"Marriage": [
+"mariage"
+],
+"Mascot": [
+"mascotte"
+],
+"Meal": [
+"repas"
+],
+"Model": [
+"mannequin"
+],
+"Money": [
+"argent",
+"billet"
+],
+"Monkey": [
+"singe"
+],
+"Monument": [
+"monument"
+],
+"Moon": [
+"lune"
+],
+"Mosque": [
+"mosquee"
+],
+"Motorcycle": [
+"moto"
+],
+"Mountain": [
+"montagne",
+"sommet"
+],
+"Moustache": [
+"moustache"
+],
+"Museum": [
+"musee"
+],
+"Musician": [
+"musicien"
+],
+"Nature": [
+"nature"
+],
+"Nebula": [
+"nebuleuse"
+],
+"Necklace": [
+"collier"
+],
+"News": [
+"actualite",
+"journal"
+],
+"Newspaper": [
+"journal"
+],
+"Night": [
+"nuit"
+],
+"Nightclub": [
+"boite de nuit"
+],
+"Outerwear": [
+"manteau",
+"vetement"
+],
+"Palace": [
+"palais"
+],
+"Paper": [
+"papier",
+"document"
+],
+"Party": [
+"fete",
+"soiree"
+],
+"Passport": [
+"passeport"
+],
+"Pasta": [
+"pates"
+],
+"Pasteles": [
+"pasteles"
+],
+"Penguin": [
+"manchot",
+"pingouin"
+],
+"People": [
+"gens",
+"personnes"
+],
+"Person": [
+"personne",
+"portrait"
+],
+"Pest": [
+"nuisible",
+"insecte"
+],
+"Pet": [
+"animal de compagnie"
+],
+"Pho": [
+"pho",
+"soupe"
+],
+"Photograph": [
+"photo"
+],
+"Picnic": [
+"pique-nique"
+],
+"Pie": [
+"tarte"
+],
+"Pier": [
+"jetee",
+"quai"
+],
+"Pillow": [
+"oreiller"
+],
+"Pixie-bob": [
+"pixie-bob",
+"chat"
+],
+"Pizza": [
+"pizza"
+],
+"Plant": [
+"plante"
+],
+"Playground": [
+"aire de jeux"
+],
+"Plush": [
+"peluche"
+],
+"Polo": [
+"polo"
+],
+"Pomacentridae": [
+"poisson-clown",
+"poisson"
+],
+"Pool": [
+"piscine"
+],
+"Poster": [
+"affiche"
+],
+"Prairie": [
+"prairie"
+],
+"Presentation": [
+"presentation",
+"diapositive"
+],
+"Primate": [
+"singe",
+"primate"
+],
+"Prom": [
+"bal"
+],
+"Race": [
+"course"
+],
+"Rafting": [
+"rafting"
+],
+"Ragdoll": [
+"ragdoll",
+"chat"
+],
+"Rain": [
+"pluie"
+],
+"Rainbow": [
+"arc-en-ciel"
+],
+"Receipt": [
+"recu",
+"ticket",
+"facture"
+],
+"Reef": [
+"recif",
+"corail"
+],
+"Restaurant": [
+"restaurant"
+],
+"Rickshaw": [
+"pousse-pousse"
+],
+"River": [
+"riviere",
+"fleuve"
+],
+"Road": [
+"route",
+"rue"
+],
+"Rock": [
+"rocher",
+"pierre"
+],
+"Rocket": [
+"fusee"
+],
+"Rodeo": [
+"rodeo"
+],
+"Room": [
+"piece",
+"salon"
+],
+"Rowing": [
+"aviron"
+],
+"Rugby": [
+"rugby"
+],
+"Ruins": [
+"ruines"
+],
+"Running": [
+"course a pied"
+],
+"Safari": [
+"safari"
+],
+"Sailboat": [
+"voilier"
+],
+"Sand": [
+"sable"
+],
+"Santa claus": [
+"pere noel"
+],
+"Sari": [
+"sari"
+],
+"Scarf": [
+"echarpe",
+"foulard"
+],
+"Screenshot": [
+"capture d'ecran"
+],
+"Scuba diving": [
+"plongee"
+],
+"Sea": [
+"mer",
+"ocean"
+],
+"Seal": [
+"phoque"
+],
+"Selfie": [
+"selfie"
+],
+"Shelf": [
+"etagere"
+],
+"Shetland sheepdog": [
+"berger des shetland",
+"chien"
+],
+"Shikoku": [
+"shikoku",
+"chien"
+],
+"Shipwreck": [
+"epave"
+],
+"Shoe": [
+"chaussure"
+],
+"Shorts": [
+"short"
+],
+"Singer": [
+"chanteur",
+"chanteuse"
+],
+"Sink": [
+"evier",
+"lavabo"
+],
+"Skateboard": [
+"skate"
+],
+"Skateboarder": [
+"skateur"
+],
+"Skiff": [
+"skiff",
+"barque"
+],
+"Skiing": [
+"ski"
+],
+"Sky": [
+"ciel"
+],
+"Skyline": [
+"panorama urbain",
+"ville"
+],
+"Skyscraper": [
+"gratte-ciel"
+],
+"Sledding": [
+"luge"
+],
+"Smile": [
+"sourire"
+],
+"Sneakers": [
+"basket",
+"chaussure"
+],
+"Snorkeling": [
+"snorkeling",
+"palmes"
+],
+"Snow": [
+"neige"
+],
+"Snowboarding": [
+"snowboard"
+],
+"Soccer": [
+"football"
+],
+"Softball": [
+"softball"
+],
+"Soldier": [
+"soldat"
+],
+"Sparkler": [
+"cierge magique"
+],
+"Speedboat": [
+"hors-bord",
+"bateau"
+],
+"Sphynx": [
+"sphynx",
+"chat"
+],
+"Sport": [
+"sport"
+],
+"Sports": [
+"sport"
+],
+"Stadium": [
+"stade"
+],
+"Statue": [
+"statue"
+],
+"Street": [
+"rue"
+],
+"Stuffed toy": [
+"peluche"
+],
+"Submarine": [
+"sous-marin"
+],
+"Sunglasses": [
+"lunettes de soleil"
+],
+"Sunset": [
+"coucher de soleil"
+],
+"Superhero": [
+"super-heros"
+],
+"Supper": [
+"diner"
+],
+"Surfing": [
+"surf"
+],
+"Sushi": [
+"sushi"
+],
+"Swamp": [
+"marais"
+],
+"Swimming": [
+"nage",
+"baignade"
+],
+"Swimwear": [
+"maillot de bain"
+],
+"Table": [
+"table"
+],
+"Temple": [
+"temple"
+],
+"Text": [
+"texte",
+"document"
+],
+"Thanksgiving": [
+"thanksgiving"
+],
+"Tie": [
+"cravate"
+],
+"Tights": [
+"collant"
+],
+"Tower": [
+"tour"
+],
+"Toy": [
+"jouet"
+],
+"Tractor": [
+"tracteur"
+],
+"Train": [
+"train"
+],
+"Tree": [
+"arbre"
+],
+"Tubing": [
+"bouee tractee"
+],
+"Turtle": [
+"tortue"
+],
+"Tuxedo": [
+"smoking"
+],
+"Umbrella": [
+"parapluie"
+],
+"Underwater": [
+"sous l'eau"
+],
+"Van": [
+"camionnette",
+"van"
+],
+"Vegetable": [
+"legume"
+],
+"Vehicle": [
+"vehicule"
+],
+"Veil": [
+"voile"
+],
+"Volcano": [
+"volcan"
+],
+"Wakeboarding": [
+"wakeboard"
+],
+"Wall": [
+"mur"
+],
+"Waterfall": [
+"cascade",
+"chute d'eau"
+],
+"Waterfowl": [
+"oiseau d'eau",
+"canard"
+],
+"Waterskiing": [
+"ski nautique"
+],
+"Web page": [
+"page web",
+"site"
+],
+"Wedding": [
+"mariage"
+],
+"Wetsuit": [
+"combinaison"
+],
+"Wheelbarrow": [
+"brouette"
+],
+"Whiteboard": [
+"tableau blanc"
+],
+"Wildlife": [
+"faune",
+"animal sauvage"
+],
+"Window": [
+"fenetre"
+],
+"Windsurfing": [
+"planche a voile"
+],
+"Wine": [
+"vin"
+],
+"Winter": [
+"hiver"
+],
+"Youth": [
+"jeune"
+],
+"Zoo": [
+"zoo"
+]
+}

@@ -80,6 +80,11 @@ SOURCES = {
     "Winter landscapes": {"snow", "landscape"}, "Snow-covered trees": {"snow"},
     "Paintings": {"art"}, "Drawings": {"art"}, "Street art": {"art"}, "Graffiti": {"art"},
     "Oil paintings": {"art"},
+    # Livres et lecture
+    "Books": {"books"}, "Open books": {"books"}, "Stacks of books": {"books"}, "Book covers": {"books"},
+    "Old books": {"books"}, "Bookshelves": {"books"}, "Bookcases": {"books"}, "Bookshops": {"books"},
+    "Libraries": {"books"}, "People reading": {"books", "people"}, "Women reading": {"books", "people"},
+    "Men reading": {"books", "people"}, "Children reading": {"books", "people"},
     # Photos quelconques
     "Hand tools": set(), "Pens": set(), "Keys": set(), "Bottles": set(), "Textures": set(),
     "Stones": set(), "Cables": set(), "Cardboard boxes": set(), "Screws": set(), "Coins": set(),

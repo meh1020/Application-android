@@ -56,8 +56,8 @@ android {
 
     packaging {
         jniLibs {
-            // Bibliothèques natives compressées dans l'APK : le fichier à installer passe
-            // d'environ 44 à 27 Mo (moteur ONNX et ML Kit). Android les décompresse à l'installation.
+            // Bibliothèques natives compressées dans l'APK (moteur ONNX : 17,5 Mo brutes, 6,3 Mo
+            // compressées pour arm64). Android les décompresse à l'installation.
             useLegacyPackaging = true
         }
     }
@@ -82,8 +82,6 @@ dependencies {
     implementation("dev.chrisbanes.haze:haze:1.2.2")
     // Lecture/écriture des métadonnées (date, lieu, appareil) des JPEG.
     implementation("androidx.exifinterface:exifinterface:1.3.7")
-    // Reconnaissance d'images embarquée, pour la recherche par contenu hors ligne.
-    implementation("com.google.mlkit:image-labeling:17.0.9")
-    // Compréhension d'image (MobileCLIP) pour ranger les photos par catégorie.
+    // Compréhension d'image (MobileCLIP) : catégories, souvenirs et recherche par contenu.
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
 }
