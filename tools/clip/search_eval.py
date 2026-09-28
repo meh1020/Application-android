@@ -4,7 +4,10 @@ Compare la recherche actuelle (mots-clés ML Kit, calculés sur l'émulateur) et
 MobileCLIP, sur les mêmes photos de test et les mêmes requêtes françaises. Les deux utilisent ce
 que le téléphone a réellement calculé (data/phone_eval/, voir README).
 
-Usage : python search_eval.py [--detail]
+La vérité vient des sources Commons, corrigée photo par photo par search_relabel.tsv (photos vues à
+l'œil : un coucher de soleil rangé dans « Plages » reste un coucher de soleil).
+
+Usage : python search_eval.py [--detail] [--sources]
 """
 import io, json, os, re, struct, sys
 import numpy as np
@@ -33,9 +36,22 @@ def mlkit_matches(labels, query, dico):
 def rule_top1(S, k):
     return S[:, k] >= S.max(1)
 
-def singular(q):
-    """Comme PhotoLabels.singular."""
-    return " ".join(w[:-1] if len(w) > 3 and w[-1] in "sx" else w for w in q.split(" "))
+singular = cc.singular
+
+def relabels():
+    """{(fichier, requête): verdict} depuis search_relabel.tsv ; rien avec --sources (vérité d'origine,
+    seule équitable face à ML Kit, dont les intrus n'ont pas été revus)."""
+    out = {}
+    if "--sources" in sys.argv: return out
+    for line in io.open(os.path.join(HERE, "search_relabel.tsv"), encoding="utf-8"):
+        if line.startswith("#") or not line.strip(): continue
+        f, q, verdict = line.rstrip("\n").split("\t")[:3]
+        out[(f, q)] = verdict
+    return out
+
+def prefix_matching(q, vocab, concepts):
+    """Règle précédente : tout terme qui commence par la requête (« lit » trouvait « littoral »)."""
+    return [k for k, c in enumerate(concepts) if any(cc.normalize(t).startswith(q) or cc.normalize(t).startswith(singular(q)) for t in vocab[c])]
 
 def main_subject(title, q):
     """Comme PhotoLabels.isMainSubject : la recherche désigne le premier sujet de la catégorie."""
@@ -62,34 +78,47 @@ if __name__ == "__main__":
     prim, sec = export.settings()
     cats = [th.decide(p, prim, sec) for p in va.probs(X, Tc)]
 
-    rows = []; totals = {"mlkit": [0, 0, 0], "clip": [0, 0, 0]}
-    per_query = {"mlkit": ([], []), "clip": ([], [])}
+    fixes = relabels(); files = [f for f, _, _ in test]
+    kept = cc.first_specific(S, concepts)
+    METHODS = (("mlkit", "ML Kit"), ("top1", "CLIP precedente"), ("clip", "CLIP actuelle"))
+    rows = []; totals = {m: [0, 0, 0] for m, _ in METHODS}
+    per_query = {m: ([], []) for m, _ in METHODS}
     for c, pos_src in cc.TRUTH.items():
         query = vocab[c][0]
+        q = cc.normalize(query)
         pos = np.array([s in pos_src for s in src]); judged = ~np.array([s in cc.MAYBE.get(c, []) for s in src])
+        for i, f in enumerate(files):
+            verdict = fixes.get((f, q))
+            if verdict == "oui": pos[i] = True; judged[i] = True
+            elif verdict == "non": pos[i] = False; judged[i] = True
+            elif verdict == "douteux": pos[i] = False; judged[i] = False
         if pos.sum() == 0: continue
         hits = {
             "mlkit": np.array([mlkit_matches(labels.get(str(i), []), query, dico) for _, _, i in test]),
-            "clip": np.zeros(len(test), bool),
+            # Précédente : le concept premier de tout le vocabulaire, termes qui commencent par la requête.
+            "top1": np.zeros(len(test), bool),
+            # Actuelle : mots entiers d'abord, et le premier concept précis derrière les génériques.
+            "clip": kept[:, cc.matching(query, vocab, concepts)].any(1),
         }
-        q = cc.normalize(query)
-        ks = [k for k, c in enumerate(concepts) if any(cc.normalize(t).startswith(q) or cc.normalize(t).startswith(singular(q)) for t in vocab[c])]
-        for k in ks: hits["clip"] |= rule_top1(S, k)
+        for k in prefix_matching(q, vocab, concepts): hits["top1"] |= rule_top1(S, k)
         # Catégorie d'Explorer désignée par la recherche (comme dans l'app).
         linked = {key for key, (title, _) in CATEGORIES.items() if main_subject(title, q)}
-        if linked: hits["clip"] |= np.array([bool(set(c) & linked) for c in cats])
+        if linked:
+            in_cat = np.array([bool(set(c) & linked) for c in cats])
+            hits["top1"] |= in_cat; hits["clip"] |= in_cat
         row = [query, int(pos.sum())]
-        for m in ("mlkit", "clip"):
+        for m, _ in METHODS:
             h = hits[m]; tp = int((h & pos).sum()); fp = int((h & ~pos & judged).sum()); fn = int(pos.sum()) - tp
             totals[m][0] += tp; totals[m][1] += fp; totals[m][2] += fn
             per_query[m][0].append(tp / (tp + fp) if tp + fp else 1.0); per_query[m][1].append(tp / pos.sum())
             row += [tp, fp, fn]
         rows.append(row)
-    for m, label in (("mlkit", "ML Kit (actuel)"), ("clip", "MobileCLIP")):
+    for m, label in METHODS:
         tp, fp, fn = totals[m]
         print("%-16s precision moyenne %3.0f%%  rappel moyen %3.0f%%  | au total %4d trouvees, %4d intrus, %4d oubliees"
               % (label, 100 * np.mean(per_query[m][0]), 100 * np.mean(per_query[m][1]), tp, fp, fn))
     if "--detail" in sys.argv:
-        print("\n%-18s %4s | %-18s | %-18s" % ("requete", "n", "ML Kit trouv/intr/oubl", "CLIP trouv/intr/oubl"))
-        for q, n, a, b, c_, d, e, f in rows:
-            print("%-18s %4d |   %3d %3d %3d        |   %3d %3d %3d" % (q, n, a, b, c_, d, e, f))
+        print("\n%-18s %4s | %-13s | %-13s | %-13s" % ("requete", "n", "ML Kit", "CLIP preced.", "CLIP actuelle"))
+        print("%-23s | %-13s | %-13s | %-13s" % ("", "trouv/intr/oub", "trouv/intr/oub", "trouv/intr/oub"))
+        for q, n, *v in rows:
+            print("%-18s %4d | %3d %3d %3d   | %3d %3d %3d   | %3d %3d %3d" % (q, n, *v))

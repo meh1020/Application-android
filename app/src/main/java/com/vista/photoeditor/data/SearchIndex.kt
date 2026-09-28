@@ -33,7 +33,7 @@ class SearchIndex(private val context: Context) {
     // toute lecture pendant une écriture.
     private val embeddings = ConcurrentHashMap<Long, FloatArray>()
     private val categoryCache = ConcurrentHashMap<Long, List<String>>()
-    private val conceptCache = ConcurrentHashMap<Long, ClipConcepts.Best>()
+    private val conceptCache = ConcurrentHashMap<Long, ClipConcepts.Match>()
     private val mutex = Mutex()
     private var loaded = false
 
@@ -91,14 +91,14 @@ class SearchIndex(private val context: Context) {
     }
 
     /**
-     * Calcule d'avance catégories et concept principal de chaque photo, hors du fil de l'interface :
+     * Calcule d'avance catégories et concepts de chaque photo, hors du fil de l'interface :
      * une recherche ou l'ouverture d'Explorer n'ont plus qu'à lire le résultat.
      */
     private suspend fun warmUp(photos: List<MediaPhoto>) = withContext(Dispatchers.Default) {
         for (photo in photos) {
             currentCoroutineContext().ensureActive()
             categoriesOf(photo.id)
-            bestConcept(photo.id)
+            conceptsOf(photo.id)
         }
         version++
     }
@@ -124,19 +124,18 @@ class SearchIndex(private val context: Context) {
     /**
      * Pertinence de la photo pour les [concepts] recherchés, ou null si elle ne correspond pas.
      * Une photo correspond quand l'un d'eux est, de tout le vocabulaire, le concept qui la décrit le
-     * mieux : exigeant, mais c'est ce qui évite les intrus (mesuré : 84 % de précision contre 77 %
-     * pour les anciens mots-clés, et près de deux fois plus de photos retrouvées).
+     * mieux, ou le premier concept précis derrière des concepts génériques (voir
+     * [ClipConcepts.describe]) : exigeant, mais c'est ce qui évite les intrus.
      */
     fun relevance(photoId: Long, concepts: Set<Int>): Float? {
         if (concepts.isEmpty()) return null
-        val best = bestConcept(photoId) ?: return null
-        return if (best.index in concepts) best.score else null
+        return conceptsOf(photoId)?.scoreOf(concepts)
     }
 
     /** Sujets les plus fréquents dans les photos, proposés quand la recherche est vide. */
     fun suggestions(photos: List<MediaPhoto>, limit: Int = 10): List<String> {
         val counts = mutableMapOf<Int, Int>()
-        photos.forEach { photo -> bestConcept(photo.id)?.let { counts[it.index] = (counts[it.index] ?: 0) + 1 } }
+        photos.forEach { photo -> conceptsOf(photo.id)?.let { counts[it.subject] = (counts[it.subject] ?: 0) + 1 } }
         return counts.entries
             .sortedByDescending { it.value }
             .take(limit)
@@ -144,10 +143,10 @@ class SearchIndex(private val context: Context) {
             .distinct()
     }
 
-    private fun bestConcept(photoId: Long): ClipConcepts.Best? {
+    private fun conceptsOf(photoId: Long): ClipConcepts.Match? {
         conceptCache[photoId]?.let { return it }
         val embedding = embeddings[photoId]?.takeIf { it.isNotEmpty() } ?: return null
-        return clip.concepts.best(embedding).also { conceptCache[photoId] = it }
+        return clip.concepts.describe(embedding).also { conceptCache[photoId] = it }
     }
 
     /** Vecteur d'une photo : décodée à l'endroit (rotation EXIF appliquée), puis résumée. */

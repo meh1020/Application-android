@@ -129,9 +129,12 @@ data class EditState(
 
     val vignette get() = value(Adjustment.VIGNETTE) / 100f
 
+    /** Filtre seul, dosé par l'intensité. */
+    fun filterMatrix(): FloatArray = Cm.lerp(Cm.identity(), Filters.byId(filterId).matrix, filterIntensity)
+
     /** Filtre (dosé par l'intensité) puis réglages manuels. */
     fun colorMatrix(): FloatArray {
-        val filter = Cm.lerp(Cm.identity(), Filters.byId(filterId).matrix, filterIntensity)
+        val filter = filterMatrix()
 
         val contrast = value(Adjustment.CONTRAST) / 100f
         val adjustments = Cm.chain(

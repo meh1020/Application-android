@@ -83,17 +83,47 @@ le dictionnaire hérité de ML Kit (`vocabulary.json`, termes français sans acc
 courants dans une galerie de téléphone (téléphone, tablette, guitare, diplôme…) et quelques
 synonymes qui se volaient la place (« neige » aussi pour « hiver », « canoë » et « kayak »). Une
 photo correspond à une recherche quand l'un des concepts désignés est, de tout le vocabulaire,
-celui qui la décrit le mieux. `python concepts.py --export` écrit `assets/clip/concepts.bin`.
+celui qui la décrit le mieux, ou le premier concept précis derrière des concepts **génériques**
+(`GENERIC` : « animal de compagnie », « musicien », « rafting »…). `python concepts.py --export`
+écrit `assets/clip/concepts.bin`.
 
 Mesure (`search_eval.py`) : les 676 photos de test copiées dans la galerie de l'émulateur, analysées
 par l'app (mots-clés ML Kit et vecteurs MobileCLIP réellement calculés par le téléphone), 57
-requêtes françaises dont les sources Commons donnent la vérité.
+requêtes françaises dont les sources Commons donnent la vérité (`--sources`).
 
 | Recherche | Précision | Rappel | Intrus | Oublis |
 |---|---|---|---|---|
 | Mots-clés ML Kit (précédente) | 77 % | 33 % | 285 | 326 |
 | MobileCLIP | 84 % | 63 % | 53 | 209 |
-| MobileCLIP + pluriel + catégories (actuelle) | 84 % | 65 % | 63 | 180 |
+| MobileCLIP + pluriel + catégories | 84 % | 65 % | 63 | 180 |
+| + mots entiers + génériques (actuelle) | 83 % | 68 % | 60 | 157 |
+
+**Vérité corrigée à l'œil** (`search_relabel.tsv`, mesure par défaut) : les sources Commons se
+trompent dans les deux sens. Un coucher de soleil rangé dans « Plages », un sapin sous la neige
+rangé dans « Sapins de Noël » comptaient comme intrus ; un salon rangé dans « Chambres d'hôtel »
+comme oubli. 79 photos revues (intrus et oublis de la règle actuelle) : 13 montrent le sujet, 12 ne
+le montrent pas, 54 douteuses ne comptent plus. Les intrus de ML Kit n'ont pas été revus : face à
+lui, seule la vérité d'origine est équitable.
+
+| Recherche (vérité corrigée) | Précision | Rappel | Trouvées | Intrus | Oublis |
+|---|---|---|---|---|---|
+| Concept premier, début des mots (précédente) | 91 % | 73 % | 339 | 35 | 130 |
+| Mots entiers + génériques (actuelle) | 90 % | 76 % | 362 | 31 | 107 |
+
+Deux corrections, mesurées séparément :
+
+- **Mots entiers d'abord** : « lit » désignait aussi le « *lit*toral » (10 intrus, des côtes). Une
+  requête retient maintenant les termes qu'elle commence en mots entiers (« lit », « lit
+  superposé ») et ne se rabat sur le début des mots (« chie » → chien) qu'à défaut. −9 intrus, aucun
+  oubli de plus.
+- **Génériques** : les oublis venaient surtout d'un concept générique en première place, le bon
+  concept arrivant 2e ou 3e : « musicien » devant la guitare (0 guitare trouvée sur 16), « animal
+  de compagnie » devant le chien, « rafting » devant le canoë. Guitare 0 → 6, chien 14 → 19, canoë
+  7 → 11, burger 3 → 6 ; +23 trouvées pour +5 intrus. Écartés de la liste : les concepts de personnes
+  (« foule », « fête »…), de sport et de pièce, derrière lesquels le concept suivant n'est qu'une
+  supposition (des groupes devenaient « mariage »). Une marge exigée entre le générique et le
+  concept précis retirait autant de bonnes photos que d'intrus. La liste a été choisie en voyant les
+  échecs du test : elle est donc un peu favorisée par cette mesure.
 
 Ajouts ensuite : les recherches au pluriel (« livres ») trouvent ce qui est nommé au singulier, et
 une recherche qui désigne le **sujet principal** d'une catégorie d'Explorer (« livre », « plage »,

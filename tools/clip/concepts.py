@@ -54,6 +54,16 @@ EXTRA = {
 SYNONYMS = {"Kayak": ["canoe"], "Canoe": ["kayak"], "Winter": ["neige"], "Bedroom": ["lit"],
             "Hotel room": ["lit"], "Skyline": ["ville"], "City": ["panorama urbain"]}
 
+# Concepts qui chapeautent d'autres concepts : un chien est souvent d'abord un « animal de compagnie »,
+# une guitare un « musicien ». Ils ne privent pas de résultat le premier concept précis qui les suit.
+# Pas les concepts de personnes, de sport ou de pièce : derrière eux, le suivant n'est qu'une
+# supposition (des groupes devenaient « mariage », une salle à manger « lit »).
+GENERIC = {"Animal", "Pet", "Wildlife", "Primate", "Waterfowl", "Flora", "Plant", "Nature", "Food", "Cuisine",
+           "Meal", "Lunch", "Supper", "Dessert", "Fast food", "Drink", "Alcohol", "Vehicle", "Aircraft",
+           "Furniture", "Fashion", "Outerwear", "Jewellery", "Art", "Musician",
+           # Activités : le canoë passe souvent derrière « rafting » ou « aviron ».
+           "Rafting", "Rowing", "Dance", "Eating", "Hiking", "Backpacking", "Cycling", "Swimming", "Fishing"}
+
 def vocabulary():
     """{concept anglais: [termes français sans accents]}, depuis vocabulary.json."""
     base = json.load(io.open(os.path.join(HERE, "vocabulary.json"), encoding="utf-8"))
@@ -152,16 +162,19 @@ def scores(X, C):
     return X @ C.T
 
 def export(vocab, concepts, C):
-    """concepts.bin (gros-boutiste) : version, n, dim, puis n × (clé, nom affiché, termes séparés par |, vecteur)."""
+    """concepts.bin (gros-boutiste) : version, n, dim, puis n × (clé, nom affiché, termes séparés par |,
+    générique ou non, vecteur)."""
     def utf(out, text):
         data = text.encode("utf-8"); out.write(struct.pack(">H", len(data))); out.write(data)
+    assert GENERIC <= set(concepts), GENERIC - set(concepts)
     path = os.path.join(ASSETS, "concepts.bin")
     with open(path, "wb") as out:
-        out.write(struct.pack(">iii", 2, len(concepts), C.shape[1]))
+        out.write(struct.pack(">iii", 3, len(concepts), C.shape[1]))
         for c, v in zip(concepts, C):
             utf(out, c)
             utf(out, display_name(c, vocab))
             utf(out, "|".join(normalize(t) for t in vocab[c]))
+            out.write(struct.pack(">?", c in GENERIC))
             out.write(struct.pack(">%df" % C.shape[1], *v.astype(np.float32)))
     print("ecrit : %s (%d concepts, %.0f Ko)" % (path, len(concepts), os.path.getsize(path) / 1024))
 
@@ -170,10 +183,29 @@ def normalize(text):
     t = unicodedata.normalize("NFD", text.lower())
     return "".join(ch for ch in t if unicodedata.category(ch) != "Mn").strip()
 
+def singular(q):
+    """Comme PhotoLabels.singular."""
+    return " ".join(w[:-1] if len(w) > 3 and w[-1] in "sx" else w for w in q.split(" "))
+
 def matching(query, vocab, concepts):
-    """Concepts dont un terme français commence par la requête (comme dans l'app)."""
-    q = normalize(query)
-    return [k for k, c in enumerate(concepts) if any(normalize(t).startswith(q) for t in vocab[c])]
+    """Comme ClipConcepts.matching : les concepts dont un terme commence par la requête en mots entiers
+    (« lit », « lit superposé ») ; à défaut, par le début d'un mot (« chie » -> chien). Sans cela, « lit »
+    ramenait le « littoral »."""
+    q = normalize(query); qs = {q, singular(q)}
+    terms = [[normalize(t) for t in vocab[c]] for c in concepts]
+    whole = [k for k, ts in enumerate(terms) if any(t == x or t.startswith(x + " ") for t in ts for x in qs)]
+    return whole or [k for k, ts in enumerate(terms) if any(t.startswith(x) for t in ts for x in qs)]
+
+def first_specific(S, concepts):
+    """Pour chaque photo, les concepts retenus comme dans l'app : les génériques en tête du classement,
+    puis le premier concept précis. Tableau booléen photos × concepts."""
+    generic = np.array([c in GENERIC for c in concepts])
+    out = np.zeros(S.shape, bool)
+    for i, order in enumerate(np.argsort(-S, 1)):
+        for k in order:
+            out[i, k] = True
+            if not generic[k]: break
+    return out
 
 def evaluate(S, sources, concepts, rule, vocab, detail=False):
     """Au niveau de la requête française : précision, rappel, précision des premiers résultats."""

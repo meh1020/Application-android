@@ -62,6 +62,7 @@ import com.vista.photoeditor.ui.search.SearchScreen
 import com.vista.photoeditor.ui.theme.VistaTheme
 import com.vista.photoeditor.ui.trash.TrashScreen
 import com.vista.photoeditor.ui.viewer.ViewerScreen
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
@@ -131,6 +132,13 @@ class MainActivity : ComponentActivity() {
         const val KEY_ONBOARDED = "onboarded"
     }
 }
+
+/** Onglets de la barre de l'accueil. */
+private const val HOME_TAB = 0
+private const val EXPLORE_TAB = 1
+
+/** Le temps que l'accueil revienne à l'écran : la goutte glisse ensuite sous les yeux. */
+private const val RETURN_SLIDE_DELAY_MILLIS = 350L
 
 @Composable
 private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: EditorViewModel) {
@@ -209,6 +217,18 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
     // Onglet choisi dans la barre de l'accueil : la goutte y reste au retour d'un autre écran.
     var homeTab by rememberSaveable { mutableIntStateOf(0) }
     val lastViewedPhoto = remember { mutableStateMapOf<String, Long>() }
+
+    // Explorer n'est pas un écran dont on revient « dedans » : de retour sur l'accueil, la goutte
+    // glisse d'« Explorer » vers « Accueil », une fois l'accueil revenu à l'écran.
+    var previousScreen by remember { mutableStateOf(navigator.current) }
+    LaunchedEffect(navigator.current) {
+        val from = previousScreen
+        previousScreen = navigator.current
+        if (navigator.current == Screen.Home && from == Screen.Explore && homeTab == EXPLORE_TAB) {
+            delay(RETURN_SLIDE_DELAY_MILLIS)
+            homeTab = HOME_TAB
+        }
+    }
 
     BackHandler(enabled = navigator.current != Screen.Home && navigator.current != Screen.Onboarding) {
         navigator.pop()

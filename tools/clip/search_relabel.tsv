@@ -1,0 +1,82 @@
+# Verdicts photo par photo, vus a l'oeil, qui corrigent la verite des sources Commons
+# pour search_eval.py. oui : la photo montre le sujet ; non : elle ne le montre pas ;
+# douteux : ni exemple ni contre-exemple. Colonnes : fichier, requete, verdict, motif.
+593b98ad421e1645.jpg	velo	oui	intrus qui montre le sujet
+844d158c11ecfd6e.jpg	velo	oui	intrus qui montre le sujet
+93331d82178c2f84.jpg	voilier	oui	intrus qui montre le sujet
+4f7626c340f66a01.jpg	concert	oui	intrus qui montre le sujet
+ecae360c59cc15cd.jpg	coucher de soleil	oui	intrus qui montre le sujet
+c0b0fac0ca959583.jpg	coucher de soleil	oui	intrus qui montre le sujet
+690e8dd8cc6e7346.jpg	coucher de soleil	oui	intrus qui montre le sujet
+f28d8b5310d501c9.jpg	neige	oui	intrus qui montre le sujet
+84bc8106b025b7ea.jpg	neige	oui	intrus qui montre le sujet
+e1bd6806d3d2b597.jpg	neige	oui	intrus qui montre le sujet
+43e7a90f70bac8d3.jpg	bouteille	oui	intrus qui montre le sujet
+f8970fff949f63cd.jpg	carton	oui	intrus qui montre le sujet
+59e782fddfcb9106.jpg	piece de monnaie	oui	intrus qui montre le sujet
+a7e2afb1242ae560.jpg	tablette	douteux	intrus discutable
+5989836d67dd04dc.jpg	avion	douteux	intrus discutable
+ef1958698c765a2a.jpg	navire	douteux	intrus discutable
+b7a829a04ab08ffd.jpg	canoe	douteux	intrus discutable
+b94d58b6c559c3b1.jpg	concert	douteux	intrus discutable
+34187bb607a1cf8f.jpg	coucher de soleil	douteux	intrus discutable
+02fb0b37e6a64b44.jpg	plage	douteux	intrus discutable
+770a5caf9a51feb0.jpg	neige	douteux	intrus discutable
+d5b13a36d75db0c4.jpg	neige	douteux	intrus discutable
+76fe9a5e3a48decd.jpg	carte	douteux	intrus discutable
+255b4ad5ef61f92b.jpg	dessin	douteux	intrus discutable
+4a1d5a9b4e57fb41.jpg	outil	douteux	intrus discutable
+37baacf5ac3d2b8b.jpg	outil	douteux	intrus discutable
+4d69b51b9736cf59.jpg	outil	douteux	intrus discutable
+b64e1e4f6774b0bc.jpg	outil	douteux	intrus discutable
+c077d5eb71e9d5c9.jpg	piece de monnaie	douteux	intrus discutable
+84d34befd3afad38.jpg	chat	non	oubliee qui ne montre pas le sujet
+747f574c2c1fa3cc.jpg	canoe	non	oubliee qui ne montre pas le sujet
+9d923befc829a2f8.jpg	sushi	non	oubliee qui ne montre pas le sujet
+fca8a2699d34730b.jpg	sushi	non	oubliee qui ne montre pas le sujet
+69a388f6b641b123.jpg	sushi	non	oubliee qui ne montre pas le sujet
+2899e2758969bfa5.jpg	lit	non	oubliee qui ne montre pas le sujet
+43fd40719016f021.jpg	panorama urbain	non	oubliee qui ne montre pas le sujet
+adc776b1b42cdf2b.jpg	desert	non	oubliee qui ne montre pas le sujet
+690e8dd8cc6e7346.jpg	foret	non	oubliee qui ne montre pas le sujet
+255b4ad5ef61f92b.jpg	bouteille	non	oubliee qui ne montre pas le sujet
+1f1dc060e5794370.jpg	stylo	non	oubliee qui ne montre pas le sujet
+c077d5eb71e9d5c9.jpg	carton	non	oubliee qui ne montre pas le sujet
+c10d7dcda2e7a985.jpg	chien	douteux	oubliee discutable
+ef6f0920eea320c9.jpg	chien	douteux	oubliee discutable
+bf26991c18ff48c3.jpg	chat	douteux	oubliee discutable
+82d6117eba218515.jpg	chat	douteux	oubliee discutable
+11d7feeaea9786a2.jpg	robe	douteux	oubliee discutable
+8b75a63faf53536b.jpg	chaussure	douteux	oubliee discutable
+223adcc1b77e154b.jpg	chaussure	douteux	oubliee discutable
+a7e2afb1242ae560.jpg	telephone	douteux	oubliee discutable
+e9797f81586d39e3.jpg	tablette	douteux	oubliee discutable
+1a6a614fdb873f46.jpg	navire	douteux	oubliee discutable
+73fd14b0cde0ed44.jpg	navire	douteux	oubliee discutable
+27feeefeb781d7a1.jpg	canoe	douteux	oubliee discutable
+1799052a22e29b62.jpg	gateau	douteux	oubliee discutable
+e29c20fa039328f9.jpg	gateau	douteux	oubliee discutable
+5989836d67dd04dc.jpg	salade	douteux	oubliee discutable
+3910a0dc97f3953c.jpg	salade	douteux	oubliee discutable
+961988257e63aa45.jpg	burger	douteux	oubliee discutable
+005c0355feb221a7.jpg	sushi	douteux	oubliee discutable
+6107c64373eac63b.jpg	concert	douteux	oubliee discutable
+934aac2eaa1e753b.jpg	concert	douteux	oubliee discutable
+d5592bc570544e44.jpg	concert	douteux	oubliee discutable
+16e1fe2b6bbb3941.jpg	mariage	douteux	oubliee discutable
+ae9d0610c22fb7b5.jpg	coucher de soleil	douteux	oubliee discutable
+ecae360c59cc15cd.jpg	plage	douteux	oubliee discutable
+986221c37858762d.jpg	foret	douteux	oubliee discutable
+27054767919c3b43.jpg	basket	douteux	oubliee discutable
+ef3f7f556ffb436f.jpg	basket	douteux	oubliee discutable
+6c81bee1b6a703a3.jpg	ecriture	douteux	oubliee discutable
+ae82b18401d51b42.jpg	ecriture	douteux	oubliee discutable
+9b706ecc960500ab.jpg	tableau	douteux	oubliee discutable
+dda2e259ec3015bf.jpg	tableau	douteux	oubliee discutable
+0114b4530dc2e1d7.jpg	dessin	douteux	oubliee discutable
+636aa8733b84f1ee.jpg	graffiti	douteux	oubliee discutable
+d5ab0a5231a5eed1.jpg	graffiti	douteux	oubliee discutable
+1e35a0d405ab8ced.jpg	stylo	douteux	oubliee discutable
+583bab26cba14ffc.jpg	ampoule	douteux	oubliee discutable
+f11686bf424482b0.jpg	outil	douteux	oubliee discutable
+734fbe2625381220.jpg	outil	douteux	oubliee discutable

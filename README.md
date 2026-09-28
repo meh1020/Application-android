@@ -21,7 +21,7 @@
 | 🖼️ **Galerie** | Parcours par albums animés, grille en quinconce, sélection multiple, tri par date |
 | 🔍 **Recherche intelligente** | Par nom, album, date *ou* contenu (« robe », « chien », « coucher de soleil »), hors ligne, sur 2 000 photos |
 | 🪄 **Explorer (IA)** | 19 catégories remplies toutes seules par MobileCLIP (Personnes, Plages, Vêtements…) et souvenirs automatiques |
-| ✏️ **Éditeur non destructif** | 13 filtres, 8 réglages fins, recadrage libre ou verrouillé, redressement ±45°, annuler/rétablir |
+| ✏️ **Éditeur non destructif** | 13 filtres, 8 réglages fins, retouche automatique, recadrage libre ou verrouillé, redressement ±45°, annuler/rétablir |
 | 🚀 **Fluidité 120 Hz** | Adaptation dynamique du mode d'affichage, animations optimisées sans recalcul d'interface |
 | 🌗 **Thème adaptatif** | Clair & sombre (suivi du système), basculement instantané sans redémarrage |
 | 🔒 **Vie privée** | Aucune donnée envoyée : analyse IA, édition et stockage 100 % en local |
@@ -64,6 +64,7 @@ Carrousel 3D avec photos voisines floutées et décalées en perspective, pannea
 ### ✏️ Éditeur
 - **Filtres** — 13 filtres (Vivid, Fade, Noir, Warm, Cool, Drama…) avec curseur d'intensité.
 - **Ajuster** — Luminosité, Exposition, Contraste, Saturation, Chaleur, Teinte, Fondu, Vignette.
+- **Auto** (panneau Ajuster) — exposition, contraste et balance des blancs calculés d'après la photo, posés sur les curseurs pour être ajustés ; un second appui les retire. Les tons sont étirés comme un réglage des niveaux, sans jamais assombrir une photo claire ni éclaircir fortement une nuit ; la dominante de couleur est estimée sur les contours (« gray-edge »), qu'un ciel bleu ou une pelouse ne faussent pas, et une photo trop chaude n'est refroidie qu'à moitié. Planche avant / après : `tools/editor/auto_enhance_sheet.py`.
 - **Recadrer** — Règle graduée de redressement ±45° avec zoom automatique, formats prédéfinis (Libre, Carré, Portrait, Story, Large…), verrouillage du rapport, rotation 90°, miroir.
 - **Comparer** — Maintenir l'image pour afficher l'original côte à côte.
 
@@ -72,7 +73,7 @@ Barre de recherche avec, en pastilles, les sujets les plus fréquents de vos pho
 
 Les recherches au pluriel fonctionnent (« livres »), et une recherche qui désigne une catégorie d'Explorer (« livre », « plage », « fleurs ») ramène aussi ses photos.
 
-Mesurée sur les mêmes 676 photos et 57 requêtes que l'ancienne recherche par mots-clés ML Kit : précision 84 % contre 77 %, deux fois plus de photos retrouvées (rappel 65 % contre 33 %), 63 intrus contre 285.
+Mesurée sur les mêmes 676 photos et 57 requêtes que l'ancienne recherche par mots-clés ML Kit : précision 83 % contre 77 %, deux fois plus de photos retrouvées (rappel 68 % contre 33 %), 60 intrus contre 285. Une fois la vérité du test corrigée à l'œil (des intrus montraient bien le sujet), 90 % de précision et 76 % de rappel.
 
 ### 🗑️ Corbeille
 Galerie des éléments supprimés avec options **Restaurer** ou **Supprimer définitivement**.

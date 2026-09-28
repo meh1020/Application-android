@@ -192,44 +192,71 @@ class ClipConcepts(
     private val displayNames: List<String>,
     /** Termes français de chaque concept, sans accents ni majuscules. */
     private val terms: List<List<String>>,
+    /** Concepts qui en chapeautent d'autres (« animal de compagnie », « musicien »). */
+    private val generic: BooleanArray,
     private val vectors: Array<FloatArray>,
 ) {
-    /** Concept qui décrit le mieux une photo, et sa similarité. */
-    class Best(val index: Int, val score: Float)
+    /**
+     * Concepts retenus pour une photo, du plus ressemblant au moins ressemblant, et leur similarité :
+     * les concepts génériques en tête du classement, puis le premier concept précis.
+     */
+    class Match(private val indices: IntArray, private val scores: FloatArray) {
+        /** Le concept précis, qui nomme le sujet de la photo (« chien » plutôt qu'« animal de compagnie »). */
+        val subject: Int get() = indices.last()
 
-    fun best(embedding: FloatArray): Best {
-        var bestIndex = 0
-        var bestScore = Float.NEGATIVE_INFINITY
-        for (c in vectors.indices) {
-            val v = vectors[c]
-            var dot = 0f
-            for (d in v.indices) dot += v[d] * embedding[d]
-            if (dot > bestScore) { bestScore = dot; bestIndex = c }
+        /** Similarité du premier des [concepts] retenu pour la photo, ou null si aucun ne l'est. */
+        fun scoreOf(concepts: Set<Int>): Float? {
+            for (i in indices.indices) if (indices[i] in concepts) return scores[i]
+            return null
         }
-        return Best(bestIndex, bestScore)
     }
 
     /**
-     * Concepts dont un terme commence par la requête : « chien » désigne le chien et les races de
-     * chiens, « robe » la robe et la robe de soirée. Le début du mot seulement : chercher « clé » ne
-     * doit pas ramener les « bicyclettes ».
+     * Un chien est souvent d'abord un « animal de compagnie », une guitare un « musicien » : retenir
+     * le seul premier concept perdait ces photos. Les génériques ne font donc pas écran au premier
+     * concept précis qui les suit. Mesuré : 23 photos retrouvées de plus sur 469, pour 5 intrus.
+     */
+    fun describe(embedding: FloatArray): Match {
+        val scores = FloatArray(vectors.size) { c ->
+            val v = vectors[c]
+            var dot = 0f
+            for (d in v.indices) dot += v[d] * embedding[d]
+            dot
+        }
+        val kept = ArrayList<Int>(2)
+        for (c in scores.indices.sortedByDescending { scores[it] }) {
+            kept += c
+            if (!generic[c]) break
+        }
+        return Match(kept.toIntArray(), FloatArray(kept.size) { scores[kept[it]] })
+    }
+
+    /**
+     * Concepts que désigne la requête : ceux dont un terme commence par elle en mots entiers
+     * (« robe » : la robe et la robe de soirée) ; à défaut, par le début d'un mot, pour une saisie en
+     * cours (« chie » → chien). Sans cette priorité, « lit » ramenait le « littoral » ; et jamais le
+     * milieu d'un mot : « clé » ne doit pas ramener les « bicyclettes ».
      */
     fun matching(normalizedQuery: String): Set<Int> {
         // « livres » doit trouver ce qui est nommé « livre ».
-        val singular = PhotoLabels.singular(normalizedQuery)
+        val forms = setOf(normalizedQuery, PhotoLabels.singular(normalizedQuery))
+        val whole = terms.indices.filterTo(mutableSetOf()) { c ->
+            terms[c].any { term -> forms.any { term == it || term.startsWith("$it ") } }
+        }
+        if (whole.isNotEmpty()) return whole
         return terms.indices.filterTo(mutableSetOf()) { c ->
-            terms[c].any { it.startsWith(normalizedQuery) || it.startsWith(singular) }
+            terms[c].any { term -> forms.any { term.startsWith(it) } }
         }
     }
 
     fun displayName(index: Int): String = displayNames[index]
 
     companion object {
-        private const val FORMAT_VERSION = 2
+        private const val FORMAT_VERSION = 3
 
         /**
          * Format (gros-boutiste) : version, n, dim, puis n × (clé, nom affiché, termes séparés
-         * par « | », vecteur[dim]).
+         * par « | », générique ou non, vecteur[dim]).
          */
         fun read(input: DataInputStream): ClipConcepts {
             check(input.readInt() == FORMAT_VERSION) { "concepts.bin : format inattendu" }
@@ -237,13 +264,15 @@ class ClipConcepts(
             val dim = input.readInt()
             val names = ArrayList<String>(count)
             val terms = ArrayList<List<String>>(count)
-            val vectors = Array(count) {
+            val generic = BooleanArray(count)
+            val vectors = Array(count) { index ->
                 input.readUTF() // clé anglaise : utile aux outils seulement
                 names += input.readUTF()
                 terms += input.readUTF().split('|').filter { it.isNotEmpty() }
+                generic[index] = input.readBoolean()
                 FloatArray(dim) { input.readFloat() }
             }
-            return ClipConcepts(names, terms, vectors)
+            return ClipConcepts(names, terms, generic, vectors)
         }
     }
 }

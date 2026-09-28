@@ -234,6 +234,12 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
                     onSelect = { selectedAdjustment = it },
                     onValueChange = vm::setAdjustment,
                     onCommit = { vm.commit() },
+                    autoApplied = vm.isAutoApplied,
+                    onAuto = {
+                        vm.toggleAuto {
+                            Toast.makeText(context, "Cette photo est déjà bien réglée", Toast.LENGTH_SHORT).show()
+                        }
+                    },
                 )
                 EditorTool.PRESETS -> PresetsPanel(
                     presets = vm.presets,

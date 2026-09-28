@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.CenterFocusWeak
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -264,6 +265,8 @@ fun AdjustPanel(
     onSelect: (Adjustment) -> Unit,
     onValueChange: (Adjustment, Float) -> Unit,
     onCommit: () -> Unit,
+    autoApplied: Boolean,
+    onAuto: () -> Unit,
 ) {
     val value = state.value(selected).roundToInt()
     val formatted = if (selected.isBipolar && value > 0) "+$value" else "$value"
@@ -277,6 +280,15 @@ fun AdjustPanel(
             ticksPerLabel = 5,
         )
         OptionRow {
+            // Retouche automatique : règle exposition, contraste et couleurs d'après la photo.
+            item {
+                OptionCircle(
+                    label = "Auto",
+                    icon = Icons.Outlined.AutoFixHigh,
+                    selected = autoApplied,
+                    onClick = onAuto,
+                )
+            }
             items(Adjustment.entries) { adjustment ->
                 OptionCircle(
                     label = adjustment.label,
