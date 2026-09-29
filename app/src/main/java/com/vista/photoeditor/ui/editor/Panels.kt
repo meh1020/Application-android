@@ -1,5 +1,13 @@
 package com.vista.photoeditor.ui.editor
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.vista.photoeditor.editor.ImageIO
+import com.vista.photoeditor.editor.FilterFamily
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.produceState
 import android.graphics.Bitmap
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -21,6 +29,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +37,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoFixHigh
 import androidx.compose.material.icons.outlined.BookmarkAdd
+import androidx.compose.material.icons.outlined.Brightness4
 import androidx.compose.material.icons.outlined.CenterFocusWeak
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentPaste
@@ -40,6 +50,7 @@ import androidx.compose.material.icons.outlined.CropSquare
 import androidx.compose.material.icons.outlined.Exposure
 import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material.icons.outlined.Gradient
+import androidx.compose.material.icons.outlined.Highlight
 import androidx.compose.material.icons.outlined.InvertColors
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Palette
@@ -139,7 +150,8 @@ private fun OptionCircle(
     )
     Column(
         Modifier
-            .width(62.dp)
+            // Au moins 62 dp ; plus pour un libellé long (« Hautes lumières »), plutôt que de le couper.
+            .widthIn(min = 62.dp)
             .then(if (enabled) Modifier.bouncyClickable(onClick = onClick) else Modifier)
             .graphicsLayer { alpha = if (enabled) 1f else 0.35f },
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -203,11 +215,46 @@ fun FiltersPanel(
     onIntensityChange: (Float) -> Unit,
     onCommit: () -> Unit,
 ) {
-    val thumb: ImageBitmap? = remember(thumbnail) { thumbnail?.asImageBitmap() }
-    val matrices = remember { Filters.all.associate { it.id to ColorMatrix(it.matrix) } }
+    // Vignettes rendues comme l'export (matrice puis étalonnage) : justes sur tous les Android,
+    // y compris pour les filtres que la matrice seule ne sait pas faire (Teal & Orange, Rouge seul…).
+    val previews by produceState(emptyMap<String, ImageBitmap>(), thumbnail) {
+        val source = thumbnail ?: return@produceState
+        value = withContext(Dispatchers.Default) {
+            Filters.all.associate { filter ->
+                val look = EditState(filterId = filter.id)
+                filter.id to ImageIO.render(source, look.colorMatrix(), 0f, look.grade()).asImageBitmap()
+            }
+        }
+    }
     val hasFilter = state.filterId != Filters.ORIGINAL_ID
+    // S'ouvre sur la famille du filtre en cours.
+    var family by rememberSaveable { mutableStateOf(Filters.byId(state.filterId).family) }
+    val shown = remember(family) {
+        listOf(Filters.byId(Filters.ORIGINAL_ID)) + Filters.all.filter { it.family == family && it.id != Filters.ORIGINAL_ID }
+    }
 
-    PanelColumn(if (hasFilter) "Intensité ${(state.filterIntensity * 100).roundToInt()} %" else "Choisissez un filtre") {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+        ) {
+            FilterFamily.entries.forEach { entry ->
+                FamilyChip(entry.label, selected = entry == family) { family = entry }
+            }
+        }
+        Text(
+            if (hasFilter) "Intensité ${(state.filterIntensity * 100).roundToInt()} %" else "Choisissez un filtre",
+            fontFamily = Kanit,
+            fontSize = 12.sp,
+            color = VistaColors.Primary,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 2.dp),
+            textAlign = TextAlign.Center,
+        )
         Box(
             Modifier
                 .fillMaxWidth()
@@ -225,18 +272,17 @@ fun FiltersPanel(
             }
         }
         OptionRow {
-            items(Filters.all, key = { it.id }) { filter ->
+            items(shown, key = { it.id }) { filter ->
                 OptionCircle(
                     label = filter.name,
                     selected = filter.id == state.filterId,
                     onClick = { onSelect(filter.id) },
-                    image = thumb?.let { bitmap ->
+                    image = previews[filter.id]?.let { bitmap ->
                         {
                             Image(
                                 bitmap = bitmap,
                                 contentDescription = filter.name,
                                 contentScale = ContentScale.Crop,
-                                colorFilter = ColorFilter.colorMatrix(matrices.getValue(filter.id)),
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -244,13 +290,35 @@ fun FiltersPanel(
                 )
             }
         }
+        Spacer(Modifier.height(10.dp))
     }
+}
+
+/** Onglet d'une famille de filtres. */
+@Composable
+private fun FamilyChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val background by animateColorAsState(if (selected) VistaColors.Primary else VistaColors.Surface, tween(200), label = "familyChip")
+    Text(
+        label,
+        fontFamily = Kanit,
+        fontSize = 12.sp,
+        fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+        color = if (selected) VistaColors.OnPrimary else VistaColors.Text.copy(alpha = 0.8f),
+        maxLines = 1,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(background)
+            .bouncyClickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+    )
 }
 
 private fun Adjustment.icon(): ImageVector = when (this) {
     Adjustment.BRIGHTNESS -> Icons.Outlined.LightMode
     Adjustment.EXPOSURE -> Icons.Outlined.Exposure
     Adjustment.CONTRAST -> Icons.Outlined.Contrast
+    Adjustment.HIGHLIGHTS -> Icons.Outlined.Highlight
+    Adjustment.SHADOWS -> Icons.Outlined.Brightness4
     Adjustment.SATURATION -> Icons.Outlined.InvertColors
     Adjustment.WARMTH -> Icons.Outlined.WbSunny
     Adjustment.TINT -> Icons.Outlined.Palette
@@ -314,9 +382,15 @@ fun PresetsPanel(
     onApply: (EditPreset) -> Unit,
     onDelete: (EditPreset) -> Unit,
 ) {
-    val thumb: ImageBitmap? = remember(thumbnail) { thumbnail?.asImageBitmap() }
-    val matrices = remember(presets) {
-        presets.associate { it.id to ColorMatrix(EditState().withLook(it.look).colorMatrix()) }
+    // Rendus comme l'export : un préréglage peut contenir des ombres ou un filtre étalonné.
+    val previews by produceState(emptyMap<String, ImageBitmap>(), thumbnail, presets) {
+        val source = thumbnail ?: return@produceState
+        value = withContext(Dispatchers.Default) {
+            presets.associate { preset ->
+                val look = EditState().withLook(preset.look)
+                preset.id to ImageIO.render(source, look.colorMatrix(), 0f, look.grade()).asImageBitmap()
+            }
+        }
     }
 
     PanelColumn(if (presets.isEmpty()) "Enregistrez une retouche pour la réutiliser" else "Mes préréglages") {
@@ -349,8 +423,7 @@ fun PresetsPanel(
                 items(presets, key = { it.id }) { preset ->
                     PresetItem(
                         preset = preset,
-                        image = thumb,
-                        matrix = matrices.getValue(preset.id),
+                        image = previews[preset.id],
                         onApply = { onApply(preset) },
                         onDelete = { onDelete(preset) },
                     )
@@ -365,7 +438,6 @@ fun PresetsPanel(
 private fun PresetItem(
     preset: EditPreset,
     image: ImageBitmap?,
-    matrix: ColorMatrix,
     onApply: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -389,7 +461,6 @@ private fun PresetItem(
                     bitmap = image,
                     contentDescription = preset.name,
                     contentScale = ContentScale.Crop,
-                    colorFilter = ColorFilter.colorMatrix(matrix),
                     modifier = Modifier.fillMaxSize(),
                 )
             }

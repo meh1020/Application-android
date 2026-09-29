@@ -9,11 +9,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.vista.photoeditor.editor.ImageIO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 class GalleryViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -32,6 +34,9 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
 
     /** Index de la recherche par contenu, alimenté à la demande depuis l'écran Recherche. */
     val searchIndex = SearchIndex(application)
+
+    /** Dossier masqué : photos chiffrées, retirées de la galerie. */
+    val hiddenVault = HiddenVault(application)
 
     /** Photos retirées à la main d'une catégorie. */
     val corrections = CategoryCorrections(application)
@@ -102,6 +107,45 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         photos, searchIndex::categoriesOf, searchIndex.memoryNames, System.currentTimeMillis(),
     )
 
+    private var duplicatesKey: Pair<List<MediaPhoto>, Int>? = null
+    private var duplicatesCache: List<List<MediaPhoto>> = emptyList()
+    private val sharpness = ConcurrentHashMap<Long, Float>()
+
+    /**
+     * Doublons et rafales parmi les photos analysées (voir [DuplicateFinder]), chaque série dans
+     * l'ordre des prises, les plus récentes d'abord. Recalculé quand la galerie ou l'analyse avance.
+     */
+    suspend fun duplicates(): List<List<MediaPhoto>> {
+        val snapshot = photos
+        val key = snapshot to searchIndex.version
+        if (key == duplicatesKey) return duplicatesCache
+        val result = withContext(Dispatchers.Default) {
+            val byId = snapshot.associateBy { it.id }
+            val candidates = snapshot.mapNotNull { photo ->
+                searchIndex.vectorOf(photo.id)?.let { vector ->
+                    DuplicateFinder.Candidate(
+                        photo.id, photo.dateMillis, vector,
+                        canBurst = !SmartAlbums.isScreenshot(photo) && DOCUMENTS !in searchIndex.categoriesOf(photo.id),
+                    )
+                }
+            }
+            DuplicateFinder.groups(candidates).map { ids -> ids.mapNotNull(byId::get) }
+        }
+        duplicatesKey = key
+        duplicatesCache = result
+        return result
+    }
+
+    /** Netteté de la photo (voir [Sharpness]), mesurée une fois sur une image réduite. */
+    suspend fun sharpnessOf(photo: MediaPhoto): Float = sharpness[photo.id] ?: withContext(Dispatchers.Default) {
+        runCatching {
+            val bitmap = ImageIO.decode(getApplication(), photo.uri, SHARPNESS_SIDE)
+            val pixels = IntArray(bitmap.width * bitmap.height)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            Sharpness.score(pixels, bitmap.width)
+        }.getOrDefault(0f)
+    }.also { sharpness[photo.id] = it }
+
     fun album(key: String): Album? = when {
         key == MediaRepository.ALL_KEY -> Album(MediaRepository.ALL_KEY, "Toutes les photos", photos)
         key.startsWith(SmartAlbums.CATEGORY_PREFIX) -> categories().find { it.key == key }
@@ -111,6 +155,10 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
 
     private companion object {
         const val INDEX_START_DELAY_MILLIS = 3_000L
+        const val DOCUMENTS = "documents"
+
+        /** Côté de l'image qui sert à mesurer la netteté : assez pour voir un flou de bougé. */
+        const val SHARPNESS_SIDE = 512
     }
 
     override fun onCleared() {

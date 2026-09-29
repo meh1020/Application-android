@@ -1,5 +1,6 @@
 package com.vista.photoeditor.ui.explore
 
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,10 +25,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vista.photoeditor.data.Album
 import com.vista.photoeditor.data.GalleryViewModel
+import com.vista.photoeditor.data.MediaPhoto
 import com.vista.photoeditor.ui.components.PhotoImage
 import com.vista.photoeditor.ui.components.ScreenHeader
 import com.vista.photoeditor.ui.components.plainClickable
@@ -56,6 +62,8 @@ fun ExploreScreen(
     gallery: GalleryViewModel,
     onBack: () -> Unit,
     onOpenAlbum: (String) -> Unit,
+    onOpenDuplicates: () -> Unit,
+    onOpenHidden: () -> Unit,
 ) {
     val index = gallery.searchIndex
     // L'analyse démarre à l'ouverture et reprend là où elle s'était arrêtée.
@@ -64,6 +72,9 @@ fun ExploreScreen(
     // Recalculés à chaque lot analysé : les rayons se remplissent sous les yeux.
     val memories = remember(gallery.photos, index.version) { gallery.memories() }
     val categories = remember(gallery.photos, index.version, gallery.corrections.version) { gallery.categories() }
+    val duplicates by produceState(emptyList<List<MediaPhoto>>(), gallery.photos, index.version) {
+        value = gallery.duplicates()
+    }
 
     Column(
         Modifier
@@ -98,6 +109,10 @@ fun ExploreScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
+            if (duplicates.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) { DuplicatesCard(duplicates, onOpenDuplicates) }
+            }
+
             if (memories.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) { SectionTitle("Souvenirs") }
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -115,6 +130,9 @@ fun ExploreScreen(
                     CategoryCard(category) { onOpenAlbum(category.key) }
                 }
             }
+
+            // Le dossier masqué, en bas, sans rien dire de son contenu.
+            item(span = { GridItemSpan(maxLineSpan) }) { HiddenFolderCard(onOpenHidden) }
 
             if (memories.isEmpty() && categories.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -134,6 +152,62 @@ fun ExploreScreen(
                 }
             }
         }
+    }
+}
+
+/** Invitation à faire de la place : séries de photos presque identiques à trier. */
+@Composable
+private fun DuplicatesCard(series: List<List<MediaPhoto>>, onClick: () -> Unit) {
+    val extra = series.sumOf { it.size - 1 }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(VistaColors.Surface)
+            .plainClickable(onClick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(64.dp)) {
+            // Deux vignettes décalées : l'idée d'une série.
+            series.first().getOrNull(1)?.let {
+                PhotoImage(it.uri, Modifier.size(52.dp).align(Alignment.BottomEnd).clip(RoundedCornerShape(12.dp)))
+            }
+            PhotoImage(series.first().first().uri, Modifier.size(52.dp).align(Alignment.TopStart).clip(RoundedCornerShape(12.dp)))
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Doublons et rafales", fontFamily = Kanit, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = VistaColors.Text)
+            Text(
+                "${series.size} série${if (series.size > 1) "s" else ""} · $extra photo${if (extra > 1) "s" else ""} en trop",
+                fontFamily = Kanit,
+                fontSize = 13.sp,
+                color = VistaColors.Muted,
+            )
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = VistaColors.Muted)
+    }
+}
+
+@Composable
+private fun HiddenFolderCard(onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(VistaColors.Surface)
+            .plainClickable(onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Lock, contentDescription = null, tint = VistaColors.Primary, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Dossier masqué", fontFamily = Kanit, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = VistaColors.Text)
+            Text("Protégé par empreinte ou code", fontFamily = Kanit, fontSize = 13.sp, color = VistaColors.Muted)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = VistaColors.Muted)
     }
 }
 

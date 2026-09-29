@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import com.vista.photoeditor.editor.Grade
 import com.vista.photoeditor.editor.NormRect
 import com.vista.photoeditor.editor.straightenScale
 import com.vista.photoeditor.ui.components.CircleIconButton
@@ -51,6 +52,7 @@ fun CropEditor(
     lockedRatio: Float?,
     isLocked: Boolean,
     colorMatrix: ColorMatrix,
+    grade: Grade,
     onCropChange: (NormRect) -> Unit,
     onCropCommit: () -> Unit,
     onToggleLock: () -> Unit,
@@ -84,7 +86,9 @@ fun CropEditor(
                     rotationZ = straighten
                     scaleX = zoom
                     scaleY = zoom
-                },
+                }
+                // Avant Android 13, le recadrage montre la photo sans son étalonnage.
+                .grade(grade),
         )
         Canvas(
             Modifier

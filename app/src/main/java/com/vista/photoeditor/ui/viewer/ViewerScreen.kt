@@ -128,6 +128,8 @@ fun ViewerScreen(
     onDelete: (Uri) -> Unit,
     onToggleFavorite: (MediaPhoto) -> Unit,
     onOpenWith: (Uri) -> Unit,
+    /** Déplace la photo dans le dossier masqué. */
+    onHide: (MediaPhoto) -> Unit,
     /** Photo affichée : l'album s'en sert pour se replacer au retour. */
     onPhotoShown: (Long) -> Unit = {},
 ) {
@@ -234,6 +236,10 @@ fun ViewerScreen(
                                 DropdownMenuItem(
                                     text = { Text("Ouvrir avec…", fontFamily = Kanit) },
                                     onClick = { menu = false; onOpenWith(current.uri) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Masquer", fontFamily = Kanit) },
+                                    onClick = { menu = false; onHide(current) },
                                 )
                             }
                         }

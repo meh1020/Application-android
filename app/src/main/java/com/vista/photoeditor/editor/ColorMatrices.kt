@@ -98,6 +98,33 @@ object ColorMatrices {
         )
     }
 
+    /**
+     * Noir et blanc viré : la luminosité va de la couleur [dark] (noirs) à [light] (blancs),
+     * 0xRRGGBB. Linéaire en luminosité, donc faisable par une matrice.
+     */
+    fun duotone(dark: Int, light: Int): FloatArray {
+        fun ch(c: Int, shift: Int) = ((c shr shift) and 0xFF).toFloat()
+        val out = FloatArray(20)
+        for ((row, shift) in listOf(0 to 16, 1 to 8, 2 to 0)) {
+            val a = ch(dark, shift)
+            val span = (ch(light, shift) - a) / 255f
+            out[row * 5] = LUMA_R * span
+            out[row * 5 + 1] = LUMA_G * span
+            out[row * 5 + 2] = LUMA_B * span
+            out[row * 5 + 4] = a
+        }
+        out[18] = 1f
+        return out
+    }
+
+    /** Chaque couleur de sortie est la même combinaison de rouge, vert et bleu : un noir et blanc « filtré ». */
+    fun monoMix(r: Float, g: Float, b: Float) = floatArrayOf(
+        r, g, b, 0f, 0f,
+        r, g, b, 0f, 0f,
+        r, g, b, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f,
+    )
+
     fun sepia() = floatArrayOf(
         0.393f, 0.769f, 0.189f, 0f, 0f,
         0.349f, 0.686f, 0.168f, 0f, 0f,

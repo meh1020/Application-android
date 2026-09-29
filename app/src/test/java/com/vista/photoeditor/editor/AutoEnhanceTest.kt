@@ -42,15 +42,20 @@ class AutoEnhanceTest {
         return (0xFF shl 24) or (ch(c.first) shl 16) or (ch(c.second) shl 8) or ch(c.third)
     }
 
+    /** Rendu complet, comme à l'export : matrice de couleurs puis courbe de tons. */
     private fun apply(pixels: IntArray, values: Map<Adjustment, Float>): List<Triple<Float, Float, Float>> {
-        val m = EditState(adjustments = values.filterValues { it != 0f }).colorMatrix()
-        return pixels.map { p ->
+        val state = EditState(adjustments = values.filterValues { it != 0f })
+        val m = state.colorMatrix()
+        val out = IntArray(pixels.size) { i ->
+            val p = pixels[i]
             val r = ((p shr 16) and 0xFF).toFloat()
             val g = ((p shr 8) and 0xFF).toFloat()
             val b = (p and 0xFF).toFloat()
-            fun row(o: Int) = (m[o] * r + m[o + 1] * g + m[o + 2] * b + m[o + 4]).coerceIn(0f, 255f)
-            Triple(row(0), row(5), row(10))
+            fun row(o: Int) = (m[o] * r + m[o + 1] * g + m[o + 2] * b + m[o + 4]).roundToInt().coerceIn(0, 255)
+            (0xFF shl 24) or (row(0) shl 16) or (row(5) shl 8) or row(10)
         }
+        state.grade().applyTo(out)
+        return out.map { p -> Triple(((p shr 16) and 0xFF).toFloat(), ((p shr 8) and 0xFF).toFloat(), (p and 0xFF).toFloat()) }
     }
 
     /** Écart rouge − bleu moyen des gris de la scène (moitié haute). */
@@ -113,6 +118,25 @@ class AutoEnhanceTest {
         val lamps = IntArray(WIDTH * 3) { argb(Triple(255f, 250f, 240f)) }
         val values = AutoEnhance.compute(dark + lamps, WIDTH, EditState())
         assertTrue("exposition ${values[Adjustment.EXPOSURE]}", values.getValue(Adjustment.EXPOSURE) <= 0f)
+    }
+
+    @Test
+    fun backlitSubjectIsLiftedWithoutBurningTheSky() {
+        // Contre-jour : un sujet sombre (deux tiers de l'image) devant un ciel clair mais pas brûlé.
+        val pixels = IntArray(WIDTH * HEIGHT) { i ->
+            val x = i % WIDTH
+            val y = i / WIDTH
+            if (y < HEIGHT / 3) argb(Triple(215f + (x % 7) * 4f, 225f + (x % 5) * 3f, 238f + (x % 3) * 4f))
+            else { val v = 8f + ((x / 4 + y / 4) % 9) * 7f; argb(Triple(v * 1.1f, v, v * 0.9f)) }
+        }
+        val values = AutoEnhance.compute(pixels, WIDTH, EditState())
+        assertTrue("ombres ${values[Adjustment.SHADOWS]}", values.getValue(Adjustment.SHADOWS) > 0f)
+        val before = apply(pixels, emptyMap())
+        val after = apply(pixels, values)
+        fun subject(c: List<Triple<Float, Float, Float>>) = c.drop(WIDTH * HEIGHT / 3).map { (r, g, b) -> 0.2126f * r + 0.7152f * g + 0.0722f * b }.average()
+        fun burnt(c: List<Triple<Float, Float, Float>>) = c.take(WIDTH * HEIGHT / 3).count { (r, g, b) -> maxOf(r, g, b) >= 254f }
+        assertTrue("sujet ${subject(before)} -> ${subject(after)}", subject(after) > subject(before) * 1.5)
+        assertTrue("ciel brûlé ${burnt(before)} -> ${burnt(after)}", burnt(after) <= burnt(before))
     }
 
     @Test

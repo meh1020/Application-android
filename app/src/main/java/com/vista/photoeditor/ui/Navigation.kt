@@ -15,6 +15,8 @@ sealed interface Screen {
     data object Search : Screen
     data object Explore : Screen
     data object Trash : Screen
+    data object Duplicates : Screen
+    data object Hidden : Screen
 }
 
 /** Pile de navigation simple, conservée lors des changements de configuration. */

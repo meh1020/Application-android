@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 et plus : le dossier masqué ne part ni dans la sauvegarde en ligne, ni vers un
+     nouvel appareil. Sa clé reste dans le Keystore de ce téléphone : ailleurs, il serait illisible. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="hidden/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="hidden/" />
+    </device-transfer>
+</data-extraction-rules>

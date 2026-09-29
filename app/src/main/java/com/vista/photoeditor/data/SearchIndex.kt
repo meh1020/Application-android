@@ -103,6 +103,9 @@ class SearchIndex(private val context: Context) {
         version++
     }
 
+    /** Vecteur MobileCLIP de la photo (norme 1), ou null tant qu'elle n'est pas analysée. */
+    fun vectorOf(photoId: Long): FloatArray? = embeddings[photoId]?.takeIf { it.isNotEmpty() }
+
     /**
      * Catégories de la photo (« beach », « people »…), d'après son vecteur MobileCLIP. Vide tant
      * qu'elle n'est pas analysée, ou si elle ne ressemble à aucune catégorie.

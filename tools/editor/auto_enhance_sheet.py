@@ -50,8 +50,8 @@ def sheet(per_sheet=24, cols=4):
             x, y = (i % cols) * (SIDE * 2 + 8), (i // cols) * (SIDE + 20)
             page.paste(read_raw(os.path.join(src, name + ".rgb")), (x, y))
             page.paste(read_raw(os.path.join(out, name + ".rgb")), (x + SIDE, y))
-            e, c, w, t = values[name]
-            dr.text((x + 2, y + SIDE + 2), "%s  expo %s  contr %s  chal %s  teinte %s" % (name[:3], e, c, w, t), fill="black", font=font)
+            e, c, sh, hi, w, t = values[name]
+            dr.text((x + 2, y + SIDE + 2), "%s  exp %s  con %s  omb %s  hl %s  cha %s  tei %s" % (name[:3], e, c, sh, hi, w, t), fill="black", font=font)
         path = os.path.join(ROOT, "sheet_%d.jpg" % (s // per_sheet)); page.save(path, quality=85); print(path)
 
 if __name__ == "__main__":

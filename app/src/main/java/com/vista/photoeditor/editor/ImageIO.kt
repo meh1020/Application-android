@@ -100,8 +100,11 @@ object ImageIO {
         return Bitmap.createScaledBitmap(square, size, size, true)
     }
 
-    /** Applique les couleurs et la vignette : doit rester fidèle à l'aperçu Compose. */
-    fun render(src: Bitmap, colorMatrix: FloatArray, vignette: Float): Bitmap {
+    /**
+     * Applique les couleurs, l'étalonnage (ombres, hautes lumières, virage partiel, couleur
+     * sélective), puis la vignette, dans cet ordre : doit rester fidèle à l'aperçu Compose.
+     */
+    fun render(src: Bitmap, colorMatrix: FloatArray, vignette: Float, grade: Grade = Grade.IDENTITY): Bitmap {
         val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         canvas.drawColor(Color.WHITE)
@@ -109,6 +112,7 @@ object ImageIO {
             colorFilter = ColorMatrixColorFilter(colorMatrix)
         }
         canvas.drawBitmap(src, 0f, 0f, paint)
+        applyGrade(out, grade)
 
         if (vignette > 0f) {
             val w = out.width.toFloat()
@@ -126,6 +130,27 @@ object ImageIO {
         }
         return out
     }
+
+    /**
+     * Étalonnage sur place, par bandes de lignes : une photo de 16 mégapixels n'est jamais copiée
+     * d'un bloc en mémoire.
+     */
+    fun applyGrade(bitmap: Bitmap, grade: Grade) {
+        if (grade.isIdentity) return
+        val width = bitmap.width
+        val rows = max(1, TONE_STRIP_PIXELS / width)
+        val strip = IntArray(width * rows)
+        var y = 0
+        while (y < bitmap.height) {
+            val h = min(rows, bitmap.height - y)
+            bitmap.getPixels(strip, 0, width, 0, y, width, h)
+            grade.applyTo(strip, 0, width * h)
+            bitmap.setPixels(strip, 0, width, 0, y, width, h)
+            y += h
+        }
+    }
+
+    private const val TONE_STRIP_PIXELS = 1 shl 20
 
     /**
      * Enregistre le rendu dans la galerie en recopiant les métadonnées de [source]

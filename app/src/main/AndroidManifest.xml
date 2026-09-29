@@ -8,9 +8,13 @@
         android:maxSdkVersion="32" />
     <!-- Permet de lire le lieu enregistré dans la photo, pour le recopier dans l'export. -->
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+    <!-- Empreinte ou code de l'appareil pour ouvrir le dossier masqué (accordée d'office). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:largeHeap="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"

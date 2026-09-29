@@ -305,7 +305,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                     val full = ImageIO.decode(getApplication(), uri, EXPORT_MAX_SIDE)
                     val g = snapshot.geometry
                     val straightened = ImageIO.straighten(ImageIO.transform(full, g), g.straighten)
-                    ImageIO.render(ImageIO.crop(straightened, g.crop), snapshot.colorMatrix(), snapshot.vignette)
+                    ImageIO.render(ImageIO.crop(straightened, g.crop), snapshot.colorMatrix(), snapshot.vignette, snapshot.grade())
                 }
                 savedUri = ImageIO.saveToGallery(getApplication(), output, uri)
             } catch (e: CancellationException) {

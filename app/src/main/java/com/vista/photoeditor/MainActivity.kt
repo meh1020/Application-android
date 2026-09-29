@@ -1,5 +1,12 @@
 package com.vista.photoeditor
 
+import com.vista.photoeditor.ui.hidden.unlock
+import com.vista.photoeditor.ui.hidden.canProtect
+import com.vista.photoeditor.ui.hidden.HiddenScreen
+import com.vista.photoeditor.data.MediaPhoto
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import android.provider.Settings
 import android.app.PendingIntent
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -54,6 +61,7 @@ import com.vista.photoeditor.ui.components.AppleMotion
 import com.vista.photoeditor.ui.components.GlassScope
 import com.vista.photoeditor.ui.components.LocalNavAnimatedVisibilityScope
 import com.vista.photoeditor.ui.components.LocalSharedTransitionScope
+import com.vista.photoeditor.ui.duplicates.DuplicatesScreen
 import com.vista.photoeditor.ui.editor.EditorScreen
 import com.vista.photoeditor.ui.explore.ExploreScreen
 import com.vista.photoeditor.ui.home.HomeScreen
@@ -192,6 +200,42 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
         mediaRequest.launch(IntentSenderRequest.Builder(pending.intentSender).build())
     }
 
+    // Dossier masqué : les photos sont d'abord chiffrées, puis leurs originaux supprimés de la
+    // galerie (confirmation du système). Le coffre constate lui-même, d'après la galerie, ce qui a
+    // été supprimé : une copie n'entre dans le dossier que si son original est bien parti.
+    val scope = rememberCoroutineScope()
+    val vault = gallery.hiddenVault
+    val hideRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
+        scope.launch {
+            val moved = vault.settle()
+            if (moved > 0) toast(if (moved > 1) "$moved photos masquées" else "Photo masquée")
+            gallery.refresh()
+        }
+    }
+    val hidePhotos: (List<MediaPhoto>) -> Unit = { photos ->
+        if (!canProtect(context)) {
+            toast("Définissez d'abord un verrouillage de l'écran (code ou empreinte)")
+        } else {
+            scope.launch {
+                val originals = vault.prepare(photos)
+                if (originals.isEmpty()) {
+                    toast("Impossible de masquer ces photos")
+                } else {
+                    val request = MediaRepository.deleteRequest(context, originals)
+                    hideRequest.launch(IntentSenderRequest.Builder(request.intentSender).build())
+                }
+            }
+        }
+    }
+    val openHidden: () -> Unit = {
+        if (!canProtect(context)) {
+            toast("Définissez d'abord un verrouillage de l'écran (code ou empreinte)")
+            context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+        } else {
+            unlock(context, onSuccess = { navigator.push(Screen.Hidden) }, onFailure = { toast(it) })
+        }
+    }
+
     val share: (List<Uri>) -> Unit = { uris ->
         val intent = if (uris.size == 1) {
             Intent(Intent.ACTION_SEND).setType("image/*").putExtra(Intent.EXTRA_STREAM, uris.first())
@@ -277,7 +321,7 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 onCamera = takePhoto,
                 onTrash = { navigator.push(Screen.Trash) },
                 onCreations = {
-                    val creations = gallery.albums.find { it.name == "Créations Vista" }
+                    val creations = gallery.albums.find { it.name == MediaRepository.CREATIONS_NAME }
                     if (creations != null) navigator.push(Screen.AlbumDetail(creations.key))
                     else toast("Vos photos exportées apparaîtront ici")
                 },
@@ -301,6 +345,7 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 onAdd = importPhoto,
                 onShare = share,
                 onDelete = { launchRequest(MediaRepository.trashRequest(context, it, trash = true)) },
+                onHide = hidePhotos,
                 memory = albumMemories.getOrPut(screen.albumKey) { AlbumMemory() },
                 onRemoveFromAlbum = if (screen.albumKey.startsWith(SmartAlbums.CATEGORY_PREFIX)) {
                     { ids -> gallery.removeFromCategory(screen.albumKey, ids) }
@@ -318,6 +363,7 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 onShare = { share(listOf(it)) },
                 onDelete = { launchRequest(MediaRepository.trashRequest(context, listOf(it), trash = true)) },
                 onToggleFavorite = { launchRequest(MediaRepository.favoriteRequest(context, listOf(it.uri), !it.isFavorite)) },
+                onHide = { hidePhotos(listOf(it)) },
                 onOpenWith = { uri ->
                     val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "image/*")
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -336,6 +382,26 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 gallery = gallery,
                 onBack = { navigator.pop() },
                 onOpenAlbum = { navigator.push(Screen.AlbumDetail(it)) },
+                onOpenDuplicates = { navigator.push(Screen.Duplicates) },
+                onOpenHidden = openHidden,
+            )
+
+            Screen.Hidden -> HiddenScreen(
+                vault = vault,
+                onBack = { vault.lock(); navigator.pop() },
+                // App en arrière-plan : le dossier se referme, il faudra se reconnaître à nouveau.
+                onLock = {
+                    vault.lock()
+                    if (navigator.current == Screen.Hidden) navigator.pop()
+                },
+                onMessage = { message -> toast(message); gallery.refresh() },
+            )
+
+            Screen.Duplicates -> DuplicatesScreen(
+                gallery = gallery,
+                onBack = { navigator.pop() },
+                onOpenPhoto = { navigator.push(Screen.Viewer(MediaRepository.ALL_KEY, it)) },
+                onTrash = { launchRequest(MediaRepository.trashRequest(context, it, trash = true)) },
             )
 
             Screen.Trash -> TrashScreen(

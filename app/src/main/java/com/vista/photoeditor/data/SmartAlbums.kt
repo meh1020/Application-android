@@ -59,7 +59,7 @@ object SmartAlbums {
     }
 
     /** Capture d'écran : rangée dans l'album système des captures, ou nommée comme telle. */
-    private fun isScreenshot(photo: MediaPhoto): Boolean =
+    fun isScreenshot(photo: MediaPhoto): Boolean =
         photo.bucketName == SCREENSHOTS_TITLE ||
             photo.bucketName.contains("screenshot", ignoreCase = true) ||
             photo.name.startsWith("screenshot", ignoreCase = true)

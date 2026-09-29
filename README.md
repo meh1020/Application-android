@@ -20,11 +20,11 @@
 |---|---|
 | 🖼️ **Galerie** | Parcours par albums animés, grille en quinconce, sélection multiple, tri par date |
 | 🔍 **Recherche intelligente** | Par nom, album, date *ou* contenu (« robe », « chien », « coucher de soleil »), hors ligne, sur 2 000 photos |
-| 🪄 **Explorer (IA)** | 19 catégories remplies toutes seules par MobileCLIP (Personnes, Plages, Vêtements…) et souvenirs automatiques |
-| ✏️ **Éditeur non destructif** | 13 filtres, 8 réglages fins, retouche automatique, recadrage libre ou verrouillé, redressement ±45°, annuler/rétablir |
+| 🪄 **Explorer (IA)** | 19 catégories remplies toutes seules par MobileCLIP (Personnes, Plages, Vêtements…), souvenirs automatiques, doublons et rafales à trier |
+| ✏️ **Éditeur non destructif** | 29 filtres en 4 familles, 10 réglages fins dont ombres et hautes lumières, retouche automatique, recadrage libre ou verrouillé, redressement ±45°, annuler/rétablir |
 | 🚀 **Fluidité 120 Hz** | Adaptation dynamique du mode d'affichage, animations optimisées sans recalcul d'interface |
 | 🌗 **Thème adaptatif** | Clair & sombre (suivi du système), basculement instantané sans redémarrage |
-| 🔒 **Vie privée** | Aucune donnée envoyée : analyse IA, édition et stockage 100 % en local |
+| 🔒 **Vie privée** | Aucune donnée envoyée : analyse IA, édition et stockage 100 % en local ; dossier masqué chiffré, ouvert par empreinte ou code |
 | 📤 **Intégration système** | Ouverture depuis *« Modifier avec… »* ou *« Partager »*, export JPEG haute résolution |
 
 ---
@@ -48,12 +48,33 @@ lui coller des étiquettes isolées :
   **Captures d'écran** (d'après l'album système, jamais mélangées aux autres rayons).
 - **Souvenirs** — les photos prises à moins de 20 h d'intervalle forment un moment, nommé d'après
   la catégorie dominante (« Plage · 15–16 sept. ») ; les dates anniversaires deviennent « Il y a un an ».
+- **Doublons et rafales** — les séries de photos presque identiques (même photo enregistrée
+  plusieurs fois, prises répétées à quelques secondes d'intervalle) sont regroupées ; la plus nette
+  de chaque série est gardée et les autres proposées à la corbeille, après confirmation du système.
+  Un toucher change le choix ; favoris et créations de l'éditeur ne sont jamais proposés d'office.
+  Documents et captures d'écran ne sont regroupés que s'ils sont identiques (deux pages différentes
+  se ressemblent trop). Seuils réglés dans `tools/clip/duplicates.py`.
 - **Correction à la main** — dans une catégorie, sélectionner des photos puis « Retirer de la
   catégorie » : elles n'y reviennent plus (la photo elle-même n'est pas supprimée).
 - **Analyse en arrière-plan** dès l'ouverture de l'app (2 000 photos les plus récentes), reprise là
   où elle s'est arrêtée.
 - Mesuré sur trois jeux (Wikimedia Commons, photos Unsplash au style d'un téléphone, photos de
   l'émulateur) ; méthode, chiffres et pistes écartées dans `tools/clip/`.
+
+### 🔒 Dossier masqué
+Depuis la sélection d'un album ou le menu de la visionneuse, **Masquer** chiffre la photo dans le
+stockage privé de l'app puis la retire de la galerie (confirmation du système) : aucune autre app
+ne la voit plus. Le dossier s'ouvre depuis le bas d'Explorer, après l'empreinte ou le code de
+l'appareil ; il se referme dès que l'app passe en arrière-plan, et ni capture d'écran ni aperçu des
+apps récentes ne montrent son contenu.
+- **Chiffrement** AES-GCM, clé de données chiffrée par une clé du Keystore d'Android (elle ne quitte
+  jamais le téléphone) ; vignettes chiffrées à part pour une grille rapide. Exclu des sauvegardes.
+- **Sans perte** : une copie n'entre dans le dossier que si l'original a bien quitté la galerie,
+  constaté dans la galerie elle-même (pas d'après la réponse au dialogue, perdue si l'app est
+  arrêtée entre-temps) ; refusé, la copie est effacée.
+- **Restaurer** remet la photo dans son dossier d'origine, à sa date d'origine (écrite dans l'EXIF
+  si la photo n'en avait pas). **Supprimer** efface définitivement, après confirmation.
+- Demande un verrouillage d'écran : sans empreinte ni code, le dossier ne s'ouvre pas.
 
 ### 🗂️ Album
 Carte d'en-tête *« Le meilleur de \<mois\> »*, grille en quinconce avec tuiles pré-dimensionnées (zéro reflow), sélection multiple pour partager ou mettre à la corbeille, options de tri.
@@ -62,9 +83,21 @@ Carte d'en-tête *« Le meilleur de \<mois\> »*, grille en quinconce avec tuile
 Carrousel 3D avec photos voisines floutées et décalées en perspective, panneau d'informations (date, lieu, appareil via ExifInterface), favoris, actions **Modifier / Partager / Supprimer**, bande de miniatures rondes en bas.
 
 ### ✏️ Éditeur
-- **Filtres** — 13 filtres (Vivid, Fade, Noir, Warm, Cool, Drama…) avec curseur d'intensité.
-- **Ajuster** — Luminosité, Exposition, Contraste, Saturation, Chaleur, Teinte, Fondu, Vignette.
-- **Auto** (panneau Ajuster) — exposition, contraste et balance des blancs calculés d'après la photo, posés sur les curseurs pour être ajustés ; un second appui les retire. Les tons sont étirés comme un réglage des niveaux, sans jamais assombrir une photo claire ni éclaircir fortement une nuit ; la dominante de couleur est estimée sur les contours (« gray-edge »), qu'un ciel bleu ou une pelouse ne faussent pas, et une photo trop chaude n'est refroidie qu'à moitié. Planche avant / après : `tools/editor/auto_enhance_sheet.py`.
+- **Filtres** — 29 filtres rangés en familles, avec curseur d'intensité :
+  - **Couleur** : Vivid, Été, Portrait, Aurora, Golden, Arctic, Minuit, Pastel ;
+  - **Film** : Film, Pellicule, Cinema, Teal & Orange, Relief, Lumière douce, Contre-jour, Matte, Drama, Rétro ;
+  - **Noir & blanc** : Mono, Noir, Sélénium, Sépia, Cyanotype, Bichromie ;
+  - **Créatif** : Infrarouge, et Rouge / Jaune / Vert / Bleu seul (une couleur gardée, le reste en noir et blanc).
+
+  Un filtre est une matrice de couleurs, plus au besoin un étalonnage qu'une matrice ne sait pas
+  faire : courbe de tons (Film, Relief, Contre-jour…), virage partiel (Teal & Orange : ombres
+  bleu-vert, tons clairs orangés) ou couleur sélective. L'étalonnage suit la même formule dans le
+  shader de l'aperçu et à l'export (`Grade.kt`) : écart mesuré entre les deux sur l'émulateur, 0,7
+  sur 255 pour Rouge seul et 1,5 pour Teal & Orange. Les vignettes du panneau sont rendues comme
+  l'export, justes sur tous les Android. Planche de tous les filtres : `tools/editor/filter_sheet.py`.
+- **Ajuster** — Luminosité, Exposition, Contraste, Hautes lumières, Ombres, Saturation, Chaleur, Teinte, Fondu, Vignette.
+- **Ombres et hautes lumières** — une courbe de tons sur la luminosité (les couleurs gardent leur teinte) : éclaircir les ombres sort un sujet d'un contre-jour sans brûler le ciel, baisser les hautes lumières rend du relief aux nuages. Noirs et blancs ne bougent pas, et la courbe ne s'inverse jamais, même les deux curseurs poussés à fond. Aperçu en temps réel par un shader AGSL (Android 13 et plus ; avant, rendu calculé en arrière-plan), export par le processeur avec la même formule (`ToneCurve.kt`) : écart mesuré entre l'export et la formule, 1,7 sur 255 (compression JPEG).
+- **Auto** (panneau Ajuster) — exposition, contraste, ombres, hautes lumières et balance des blancs calculés d'après la photo, posés sur les curseurs pour être ajustés ; un second appui les retire. Les tons sont étirés comme un réglage des niveaux, sans jamais assombrir une photo claire ni éclaircir fortement une nuit ; la dominante de couleur est estimée sur les contours (« gray-edge »), qu'un ciel bleu ou une pelouse ne faussent pas, et une photo trop chaude n'est refroidie qu'à moitié. Les ombres ne remontent que si le quart le plus sombre reste très sombre à côté de vraies zones claires (contre-jour), les hautes lumières ne baissent que sur un grand ciel clair mais pas brûlé ; sur 48 photos d'essai, 19 en reçoivent. Planche avant / après : `tools/editor/auto_enhance_sheet.py`.
 - **Recadrer** — Règle graduée de redressement ±45° avec zoom automatique, formats prédéfinis (Libre, Carré, Portrait, Story, Large…), verrouillage du rapport, rotation 90°, miroir.
 - **Comparer** — Maintenir l'image pour afficher l'original côte à côte.
 

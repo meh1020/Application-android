@@ -26,8 +26,11 @@ class AutoEnhanceSheetTest {
         for (file in photos) {
             val (width, height, pixels) = read(file)
             val values = AutoEnhance.compute(pixels, width, EditState())
-            val matrix = EditState(adjustments = values.filterValues { it != 0f }).colorMatrix()
-            write(File(output, file.name), width, height, IntArray(pixels.size) { render(pixels[it], matrix) })
+            val state = EditState(adjustments = values.filterValues { it != 0f })
+            val matrix = state.colorMatrix()
+            val rendered = IntArray(pixels.size) { render(pixels[it], matrix) }
+            state.grade().applyTo(rendered)
+            write(File(output, file.name), width, height, rendered)
             log.append(file.nameWithoutExtension)
             AutoEnhance.ADJUSTMENTS.forEach { log.append('\t').append(values.getValue(it).toInt()) }
             log.append('\n')

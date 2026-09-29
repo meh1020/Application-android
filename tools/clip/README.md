@@ -142,6 +142,35 @@ Pour refaire la mesure : copier `data/push_test/` (photos de test) dans `Picture
 l'émulateur, lancer l'app de développement, puis récupérer dans `data/phone_eval/` le fichier
 `photo-clip-v1.bin` et la liste `_id` / `_display_name` de MediaStore.
 
+## Doublons et rafales
+
+`duplicates.py` règle les seuils de `DuplicateFinder.kt` avec les vecteurs du modèle livré. Séries
+fabriquées : les 240 photos Unsplash et 7 variantes de chacune (recompression, recadrage, décalage,
+zoom, rotation, exposition). Photos différentes : les paires Commons de même source.
+
+| Seuil | Séries fabriquées trouvées | Paires Commons au-dessus |
+|---|---|---|
+| 0,90 | 97 % | 284 |
+| 0,92 | 95 % | 181 |
+| 0,94 | 89 % | 101 |
+| 0,98 | — | toutes vues : la même photo |
+
+Les paires Commons les plus proches sont en fait de vraies séries (le même chien, le même bus pris
+plusieurs fois). Entre 0,90 et 0,94, en revanche, la moitié sont des photos différentes au sujet
+voisin (deux gratte-ciel, deux feux d'artifice, deux pièces de monnaie). D'où les règles :
+
+- **doublons**, à n'importe quelle date : ≥ 0,98 ;
+- **rafales** : ≥ 0,92 à moins d'une minute d'écart, ≥ 0,85 à moins de 10 secondes, chaque prise
+  restant ≥ 0,85 avec la première. Le palier à 10 secondes rattrape la prise très floue d'une
+  rafale d'essai (0,87 avec les autres), justement celle qu'on veut jeter ;
+- **documents et captures d'écran** : doublons seulement. Deux pages manuscrites différentes
+  atteignaient 0,92, deux pages d'un tableau 0,96.
+
+La photo gardée est la plus nette (énergie du laplacien rapportée à la variance de l'image, pour
+ne pas favoriser une prise plus claire) ; à 5 % près, la plus grande définition. Essai sur
+l'émulateur : deux rafales de 4 prises (floue, nette, décalée, éclaircie), regroupées au complet,
+la nette gardée dans les deux.
+
 ## Essayé et écarté (mesures à l'appui)
 
 | Piste | Script | Pourquoi écartée |

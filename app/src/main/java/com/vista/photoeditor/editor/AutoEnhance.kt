@@ -8,7 +8,8 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * Retouche automatique : exposition, contraste et balance des blancs calculés d'après la photo.
+ * Retouche automatique : exposition, contraste, ombres, hautes lumières et balance des blancs
+ * calculés d'après la photo.
  *
  * Le résultat est exprimé en valeurs des curseurs de l'éditeur (voir [EditState.colorMatrix]) :
  * l'utilisateur voit ce qui a été fait et peut l'ajuster. Les réglages restent prudents : une photo
@@ -18,7 +19,10 @@ import kotlin.math.sqrt
 object AutoEnhance {
 
     /** Curseurs que la retouche automatique règle ; les autres restent tels quels. */
-    val ADJUSTMENTS = listOf(Adjustment.EXPOSURE, Adjustment.CONTRAST, Adjustment.WARMTH, Adjustment.TINT)
+    val ADJUSTMENTS = listOf(
+        Adjustment.EXPOSURE, Adjustment.CONTRAST, Adjustment.SHADOWS, Adjustment.HIGHLIGHTS,
+        Adjustment.WARMTH, Adjustment.TINT,
+    )
 
     /** Noirs et blancs visés : 0,5 % des pixels au-dessous, 0,5 % au-dessus. */
     private const val BLACK_TARGET = 8f
@@ -53,6 +57,30 @@ object AutoEnhance {
     private const val PIVOT = 127.5f
 
     /**
+     * Contre-jour : le quart le plus sombre de l'image reste sous [DARK_QUARTER] après exposition et
+     * contraste, alors que des zones claires (au-dessus de [BRIGHT_AREA]) empêchent d'éclaircir le
+     * tout. Les ombres remontent alors ce quart vers [SHADOW_TARGET], sans dépasser [MAX_SHADOWS]
+     * (une silhouette voulue n'est pas effacée), ni [MAX_NIGHT_SHADOWS] la nuit (le bruit
+     * ressortirait).
+     */
+    private const val DARK_QUARTER = 45f
+    private const val BRIGHT_AREA = 215f
+    private const val SHADOW_TARGET = 62f
+    private const val MAX_SHADOWS = 40
+    private const val MAX_NIGHT_SHADOWS = 15
+
+    /**
+     * Grand ciel clair mais pas brûlé : un quart de l'image au-dessus de [BRIGHT_QUARTER] et les
+     * 5 % les plus clairs sous [BURNT]. Les hautes lumières descendent alors ces 5 % de
+     * [HIGHLIGHT_PULL], jusqu'à [MAX_HIGHLIGHTS] : les nuages retrouvent du relief. Un blanc
+     * brûlé n'a plus de détail à rendre : il n'est pas touché.
+     */
+    private const val BRIGHT_QUARTER = 200f
+    private const val BURNT = 250f
+    private const val HIGHLIGHT_PULL = 10f
+    private const val MAX_HIGHLIGHTS = 25
+
+    /**
      * Valeurs des curseurs [ADJUSTMENTS] pour la photo [pixels] (ARGB, ligne après ligne, [width]
      * pixels par ligne ; une image réduite suffit), compte tenu du filtre et des autres réglages de
      * [state]. 0 : réglage inutile.
@@ -85,6 +113,11 @@ object AutoEnhance {
         if (white - black < 16f) return none
 
         val (exposure, contrast) = levels(black, middle, white)
+        // Luminosité d'un pixel une fois l'exposition et le contraste appliqués.
+        fun leveled(fraction: Float): Float =
+            (contrast * (exposure * (percentile(histogram, n, fraction) + brightness) - PIVOT) + PIVOT).coerceIn(0f, 255f)
+        val shadows = shadowsFor(leveled(0.25f), leveled(0.95f), middle)
+        val highlights = highlightsFor(leveled(0.75f), leveled(0.95f), shadows)
 
         // Balance des blancs : l'écart de couleur restant après exposition, contraste et saturation.
         var warmth = 0f
@@ -106,6 +139,8 @@ object AutoEnhance {
         return mapOf(
             Adjustment.EXPOSURE to step(100f * log2(exposure), Adjustment.EXPOSURE),
             Adjustment.CONTRAST to step(contrastSlider, Adjustment.CONTRAST),
+            Adjustment.SHADOWS to step(shadows.toFloat(), Adjustment.SHADOWS),
+            Adjustment.HIGHLIGHTS to step(highlights.toFloat(), Adjustment.HIGHLIGHTS),
             Adjustment.WARMTH to step(warmth.coerceIn(-MAX_WARMTH, MAX_WARMTH), Adjustment.WARMTH),
             Adjustment.TINT to (step(tint.coerceIn(-MAX_TINT, MAX_TINT), Adjustment.TINT).takeIf { abs(it) >= MIN_TINT } ?: 0f),
         )
@@ -128,6 +163,26 @@ object AutoEnhance {
         val contrast = (1f - offset / PIVOT).coerceIn(MIN_CONTRAST, MAX_CONTRAST)
         val exposure = (stretch / contrast).coerceIn(0.6f, 1.8f)
         return exposure to contrast
+    }
+
+    /** Réglage des ombres (0..[MAX_SHADOWS]) : le plus faible qui éclaircit assez le quart sombre. */
+    private fun shadowsFor(darkQuarter: Float, bright: Float, middle: Float): Int {
+        if (darkQuarter >= DARK_QUARTER || bright < BRIGHT_AREA) return 0
+        val limit = if (middle < NIGHT_MIDDLE) MAX_NIGHT_SHADOWS else MAX_SHADOWS
+        for (value in 5..limit step 5) {
+            if (ToneCurve.of(value.toFloat(), 0f).map(darkQuarter / 255f) * 255f >= SHADOW_TARGET) return value
+        }
+        return limit
+    }
+
+    /** Réglage des hautes lumières (0..−[MAX_HIGHLIGHTS]), compte tenu des ombres déjà choisies. */
+    private fun highlightsFor(brightQuarter: Float, top: Float, shadows: Int): Int {
+        if (brightQuarter < BRIGHT_QUARTER || top >= BURNT) return 0
+        val target = top - HIGHLIGHT_PULL
+        for (value in 5..MAX_HIGHLIGHTS step 5) {
+            if (ToneCurve.of(shadows.toFloat(), -value.toFloat()).map(top / 255f) * 255f <= target) return -value
+        }
+        return -MAX_HIGHLIGHTS
     }
 
     /**

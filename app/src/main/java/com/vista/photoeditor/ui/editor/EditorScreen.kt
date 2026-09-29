@@ -11,6 +11,7 @@ import com.vista.photoeditor.ui.components.GlassBackdrop
 import com.vista.photoeditor.ui.components.GlassBarItem
 import com.vista.photoeditor.ui.components.GlassSlidingBar
 import com.vista.photoeditor.ui.components.liquidGlass
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -84,7 +85,17 @@ import com.vista.photoeditor.ui.components.softShadow
 import com.vista.photoeditor.ui.components.vignetteBrush
 import com.vista.photoeditor.ui.theme.Kanit
 import com.vista.photoeditor.ui.theme.VistaColors
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.ImageBitmap
+import com.vista.photoeditor.editor.ImageIO
+import com.vista.photoeditor.editor.Grade
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+
+/** Attente après le dernier mouvement du curseur avant de recalculer l'aperçu sans shader. */
+private const val CPU_TONE_DELAY_MILLIS = 80L
 
 enum class EditorTool(val label: String, val icon: ImageVector) {
     FILTERS("Filtres", Icons.Outlined.AutoAwesome),
@@ -105,6 +116,7 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
 
     val state = vm.state
     val colorMatrix = remember(state) { ColorMatrix(state.colorMatrix()) }
+    val grade = remember(state) { state.grade() }
     val requestClose: () -> Unit = {
         if (vm.hasChanges && vm.savedUri == null) confirmExit = true else onClose()
     }
@@ -194,23 +206,25 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
                             lockedRatio = vm.lockedRatio,
                             isLocked = vm.lockedRatio != null,
                             colorMatrix = colorMatrix,
+                            grade = grade,
                             onCropChange = vm::updateCrop,
                             onCropCommit = { vm.commit() },
                             onToggleLock = vm::toggleAspectLock,
                         )
                     } else {
-                        PhotoPreview(cropped, original, colorMatrix, state.vignette)
+                        PhotoPreview(cropped, original, colorMatrix, grade, state.vignette)
                     }
                 }
             }
         }
 
-        // Panneau d'outils en verre.
+        // Panneau d'outils en verre ; plus haut pour les filtres, qui ont une rangée de familles.
+        val panelHeight by animateDpAsState(if (tool == EditorTool.FILTERS) 246.dp else 196.dp, tween(240), label = "panelHeight")
         Box(
             Modifier
                 .padding(horizontal = 10.dp, vertical = 6.dp)
                 .fillMaxWidth()
-                .height(196.dp)
+                .height(panelHeight)
                 .liquidGlass(RoundedCornerShape(32.dp))
         ) {
             AnimatedContent(
@@ -390,11 +404,28 @@ private fun EditorAmbient(thumbnail: Bitmap?) {
 
 /** Aperçu retouché ; un appui long affiche l'original. */
 @Composable
-private fun PhotoPreview(edited: Bitmap, original: Bitmap, colorMatrix: ColorMatrix, vignette: Float) {
+private fun PhotoPreview(edited: Bitmap, original: Bitmap, colorMatrix: ColorMatrix, grade: Grade, vignette: Float) {
     var showOriginal by remember { mutableStateOf(false) }
     val editedImage = remember(edited) { edited.asImageBitmap() }
     val originalImage = remember(original) { original.asImageBitmap() }
-    val image = if (showOriginal) originalImage else editedImage
+    // Avant Android 13, pas de shader : l'étalonnage est rendu par le processeur, en arrière-plan,
+    // un instant après le dernier mouvement du curseur. Couleurs comprises : elles viennent avant.
+    val rendered by produceState<ImageBitmap?>(null, edited, colorMatrix, grade) {
+        if (supportsGradeShader || grade.isIdentity) {
+            value = null
+            return@produceState
+        }
+        delay(CPU_TONE_DELAY_MILLIS)
+        value = withContext(Dispatchers.Default) {
+            ImageIO.render(edited, colorMatrix.values, 0f, grade).asImageBitmap()
+        }
+    }
+    val cpuGrade = !showOriginal && rendered != null
+    val image = when {
+        showOriginal -> originalImage
+        cpuGrade -> rendered!!
+        else -> editedImage
+    }
 
     Box(
         Modifier
@@ -422,15 +453,17 @@ private fun PhotoPreview(edited: Bitmap, original: Bitmap, colorMatrix: ColorMat
                 bitmap = image,
                 contentDescription = "Photo",
                 contentScale = ContentScale.FillBounds,
-                colorFilter = if (showOriginal) null else ColorFilter.colorMatrix(colorMatrix),
+                colorFilter = if (showOriginal || cpuGrade) null else ColorFilter.colorMatrix(colorMatrix),
                 modifier = Modifier
                     .fillMaxSize()
                     .softShadow(RoundedCornerShape(16.dp), 14.dp)
                     .clip(RoundedCornerShape(16.dp))
+                    // La vignette vient après l'étalonnage, comme à l'export.
                     .drawWithContent {
                         drawContent()
                         if (!showOriginal && vignette > 0f) drawRect(vignetteBrush(size, vignette))
-                    },
+                    }
+                    .grade(if (showOriginal) Grade.IDENTITY else grade),
             )
         }
         Row(

@@ -1,5 +1,6 @@
 package com.vista.photoeditor.ui.album
 
+import androidx.compose.material.icons.outlined.VisibilityOff
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -118,6 +119,8 @@ fun AlbumScreen(
     onAdd: () -> Unit,
     onShare: (List<Uri>) -> Unit,
     onDelete: (List<Uri>) -> Unit,
+    /** Déplace les photos dans le dossier masqué. */
+    onHide: (List<MediaPhoto>) -> Unit,
     memory: AlbumMemory,
     /** Catégorie automatique : retirer des photos qui n'y ont pas leur place. */
     onRemoveFromAlbum: ((List<Long>) -> Unit)? = null,
@@ -266,6 +269,10 @@ fun AlbumScreen(
                 count = current.size,
                 onShare = { if (uris.isNotEmpty()) onShare(uris) },
                 onDelete = { if (uris.isNotEmpty()) { onDelete(uris); selection = null } },
+                onHide = {
+                    val chosen = all.filter { it.id in current }
+                    if (chosen.isNotEmpty()) { onHide(chosen); selection = null }
+                },
                 onRemove = onRemoveFromAlbum?.let { remove ->
                     { if (current.isNotEmpty()) { remove(current.toList()); selection = null } }
                 },
@@ -415,6 +422,7 @@ private fun SelectionBar(
     count: Int,
     onShare: () -> Unit,
     onDelete: () -> Unit,
+    onHide: () -> Unit,
     onRemove: (() -> Unit)?,
     onClose: () -> Unit,
     modifier: Modifier,
@@ -444,6 +452,8 @@ private fun SelectionBar(
             CircleIconButton(Icons.Outlined.RemoveCircleOutline, "Retirer de la catégorie", onRemove, size = 44.dp, enabled = count > 0)
             Spacer(Modifier.width(8.dp))
         }
+        CircleIconButton(Icons.Outlined.VisibilityOff, "Masquer", onHide, size = 44.dp, enabled = count > 0)
+        Spacer(Modifier.width(8.dp))
         CircleIconButton(Icons.Outlined.IosShare, "Partager", onShare, size = 44.dp, enabled = count > 0)
         Spacer(Modifier.width(8.dp))
         CircleIconButton(Icons.Outlined.Delete, "Supprimer", onDelete, size = 44.dp, selected = count > 0, enabled = count > 0)

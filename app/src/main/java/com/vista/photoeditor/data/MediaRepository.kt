@@ -72,6 +72,9 @@ object MediaRepository {
     const val ALL_KEY = "all"
     const val FAVORITES_KEY = "favorites"
 
+    /** Album des photos exportées par l'éditeur. */
+    const val CREATIONS_NAME = "Créations Vista"
+
     val collection: Uri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
 
     private val friendlyNames = mapOf(
@@ -79,7 +82,7 @@ object MediaRepository {
         "Screenshots" to "Captures d'écran",
         "Download" to "Téléchargements",
         "Pictures" to "Images",
-        "Vista" to "Créations Vista",
+        "Vista" to CREATIONS_NAME,
     )
 
     fun loadPhotos(context: Context, trashed: Boolean = false): List<MediaPhoto> {

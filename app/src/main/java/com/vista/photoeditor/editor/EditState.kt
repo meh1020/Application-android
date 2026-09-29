@@ -12,6 +12,8 @@ enum class Adjustment(val label: String, val min: Float, val max: Float) {
     BRIGHTNESS("Luminosité", -100f, 100f),
     EXPOSURE("Exposition", -100f, 100f),
     CONTRAST("Contraste", -100f, 100f),
+    HIGHLIGHTS("Hautes lumières", -100f, 100f),
+    SHADOWS("Ombres", -100f, 100f),
     SATURATION("Saturation", -100f, 100f),
     WARMTH("Chaleur", -100f, 100f),
     TINT("Teinte", -100f, 100f),
@@ -128,6 +130,21 @@ data class EditState(
     val geometry get() = Geometry(quarterTurns, flipH, flipV, straighten, crop)
 
     val vignette get() = value(Adjustment.VIGNETTE) / 100f
+
+    /**
+     * Étalonnage appliqué après [colorMatrix] : ombres et hautes lumières (curseurs, plus la part
+     * du filtre), virage partiel et couleur sélective du filtre, dosés par son intensité.
+     */
+    fun grade(): Grade {
+        val filter = Filters.byId(filterId)
+        val k = filterIntensity
+        val tone = ToneCurve.of(
+            (value(Adjustment.SHADOWS) + filter.shadows * k).coerceIn(-100f, 100f),
+            (value(Adjustment.HIGHLIGHTS) + filter.highlights * k).coerceIn(-100f, 100f),
+        )
+        // Intensité nulle : ni virage ni couleur sélective, pas même un shader pour rien.
+        return Grade(tone, filter.split?.takeIf { k > 0f }?.scaled(k), filter.selective?.takeIf { k > 0f }?.scaled(k))
+    }
 
     /** Filtre seul, dosé par l'intensité. */
     fun filterMatrix(): FloatArray = Cm.lerp(Cm.identity(), Filters.byId(filterId).matrix, filterIntensity)
