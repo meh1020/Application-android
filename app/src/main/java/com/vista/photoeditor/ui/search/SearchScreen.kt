@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vista.photoeditor.data.GalleryViewModel
 import com.vista.photoeditor.data.PhotoLabels
+import com.vista.photoeditor.data.SearchQuery
 import com.vista.photoeditor.ui.components.DateLabels
 import com.vista.photoeditor.ui.components.PhotoImage
 import com.vista.photoeditor.ui.components.ScreenHeader
@@ -82,9 +83,14 @@ fun SearchScreen(
     // pas figer la saisie.
     val photos by produceState(gallery.photos.take(60), q, gallery.photos, index.version) {
         value = if (q.isEmpty()) gallery.photos.take(60) else withContext(Dispatchers.Default) {
-            val concepts = index.conceptsFor(q)
+            // « plage 2023 », « chien juillet » : les mots de date filtrent, le reste se cherche.
+            val query = SearchQuery.parse(q)
+            val t = query.text
+            val pool = if (query.hasDate) gallery.photos.filter { query.matchesDate(it.dateMillis) } else gallery.photos
+            if (t.isEmpty()) return@withContext pool
+            val concepts = index.conceptsFor(t)
             // Le contenu d'abord, du plus ressemblant au moins ressemblant ; puis nom, album ou date.
-            val byContent = gallery.photos
+            val byContent = pool
                 .mapNotNull { p -> index.relevance(p.id, concepts)?.let { p to it } }
                 .sortedByDescending { it.second }
                 .map { it.first }
@@ -93,15 +99,15 @@ fun SearchScreen(
             // « Livres & lecture ») : la recherche retrouve au moins ce qu'Explorer montre, retraits
             // manuels compris.
             val byCategory = gallery.categories()
-                .filter { PhotoLabels.isMainSubject(it.name, q) }
+                .filter { PhotoLabels.isMainSubject(it.name, t) }
                 .flatMap { it.photos }
-                .filter { seen.add(it.id) }
-            byContent + byCategory + gallery.photos.filter { p ->
+                .filter { query.matchesDate(it.dateMillis) && seen.add(it.id) }
+            byContent + byCategory + pool.filter { p ->
                 p.id !in seen && (
-                    PhotoLabels.normalize(p.name).contains(q) ||
-                        PhotoLabels.normalize(p.bucketName).contains(q) ||
-                        PhotoLabels.normalize(DateLabels.day(p.dateMillis)).contains(q) ||
-                        PhotoLabels.normalize(DateLabels.month(p.dateMillis)).contains(q)
+                    PhotoLabels.normalize(p.name).contains(t) ||
+                        PhotoLabels.normalize(p.bucketName).contains(t) ||
+                        PhotoLabels.normalize(DateLabels.day(p.dateMillis)).contains(t) ||
+                        PhotoLabels.normalize(DateLabels.month(p.dateMillis)).contains(t)
                     )
             }
         }
@@ -121,7 +127,7 @@ fun SearchScreen(
         TextField(
             value = query,
             onValueChange = { query = it },
-            placeholder = { Text("Album, mois, nom de fichier…", fontFamily = Kanit) },
+            placeholder = { Text("Chien, plage 2023, juillet…", fontFamily = Kanit) },
             leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
             singleLine = true,
             textStyle = TextStyle(fontFamily = Kanit, fontSize = 16.sp),

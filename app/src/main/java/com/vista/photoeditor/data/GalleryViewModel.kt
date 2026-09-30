@@ -33,7 +33,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         private set
 
     /** Index de la recherche par contenu, alimenté à la demande depuis l'écran Recherche. */
-    val searchIndex = SearchIndex(application)
+    val searchIndex = SearchIndex.get(application)
 
     /** Dossier masqué : photos chiffrées, retirées de la galerie. */
     val hiddenVault = HiddenVault(application)
@@ -50,6 +50,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         application.contentResolver.registerContentObserver(MediaRepository.collection, true, observer)
+        IndexWorker.schedule(application)
         refresh()
     }
 
@@ -109,16 +110,24 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
 
     private var duplicatesKey: Pair<List<MediaPhoto>, Int>? = null
     private var duplicatesCache: List<List<MediaPhoto>> = emptyList()
+    private var duplicatesAt = 0L
     private val sharpness = ConcurrentHashMap<Long, Float>()
 
     /**
      * Doublons et rafales parmi les photos analysées (voir [DuplicateFinder]), chaque série dans
-     * l'ordre des prises, les plus récentes d'abord. Recalculé quand la galerie ou l'analyse avance.
+     * l'ordre des prises, les plus récentes d'abord. Recalculé quand la galerie ou l'analyse avance ;
+     * pendant l'analyse, au plus toutes les [DUPLICATES_INTERVAL_MILLIS] : comparer 2 000 photos deux
+     * à deux prend 0,5 s sur ordinateur (bien plus sur un téléphone), et l'analyse avance par lots
+     * de 50 photos.
      */
     suspend fun duplicates(): List<List<MediaPhoto>> {
         val snapshot = photos
         val key = snapshot to searchIndex.version
         if (key == duplicatesKey) return duplicatesCache
+        val now = System.currentTimeMillis()
+        if (searchIndex.isIndexing && duplicatesKey?.first == snapshot && now - duplicatesAt < DUPLICATES_INTERVAL_MILLIS) {
+            return duplicatesCache
+        }
         val result = withContext(Dispatchers.Default) {
             val byId = snapshot.associateBy { it.id }
             val candidates = snapshot.mapNotNull { photo ->
@@ -133,7 +142,17 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         }
         duplicatesKey = key
         duplicatesCache = result
+        duplicatesAt = now
         return result
+    }
+
+    /** Photos qui ressemblent à [photo] (voir [SimilarPhotos]) ; vide tant qu'elle n'est pas analysée. */
+    suspend fun similarTo(photo: MediaPhoto): List<MediaPhoto> = withContext(Dispatchers.Default) {
+        val target = searchIndex.vectorOf(photo.id) ?: return@withContext emptyList()
+        val snapshot = photos
+        val byId = snapshot.associateBy { it.id }
+        val candidates = snapshot.mapNotNull { p -> searchIndex.vectorOf(p.id)?.let { p.id to it } }
+        SimilarPhotos.rank(photo.id, target, candidates).mapNotNull(byId::get)
     }
 
     /** Netteté de la photo (voir [Sharpness]), mesurée une fois sur une image réduite. */
@@ -156,6 +175,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     private companion object {
         const val INDEX_START_DELAY_MILLIS = 3_000L
         const val DOCUMENTS = "documents"
+        const val DUPLICATES_INTERVAL_MILLIS = 15_000L
 
         /** Côté de l'image qui sert à mesurer la netteté : assez pour voir un flou de bougé. */
         const val SHARPNESS_SIDE = 512

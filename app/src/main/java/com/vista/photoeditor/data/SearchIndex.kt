@@ -15,6 +15,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.EOFException
+import java.io.FileOutputStream
+import java.io.IOException
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -25,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap
  * - la retrouver par son contenu ([relevance]) : « robe », « chien », « coucher de soleil »…
  * Tout reste sur le téléphone.
  */
-class SearchIndex(private val context: Context) {
+class SearchIndex private constructor(private val context: Context) {
 
     private val clip = ClipModel(context)
 
@@ -36,6 +39,9 @@ class SearchIndex(private val context: Context) {
     private val conceptCache = ConcurrentHashMap<Long, ClipConcepts.Match>()
     private val mutex = Mutex()
     private var loaded = false
+
+    /** Photos déjà écrites dans le fichier : seules les nouvelles y sont ajoutées. */
+    private val saved = HashSet<Long>()
 
     var indexed by mutableIntStateOf(0)
         private set
@@ -55,11 +61,16 @@ class SearchIndex(private val context: Context) {
     /** Nom de souvenir de chaque catégorie qui s'y prête (« Plage », « Neige »…). */
     val memoryNames: Map<String, String> get() = clip.classes.memoryNames
 
-    /** Analyse les photos pas encore connues ; reprend là où elle s'est arrêtée. */
-    suspend fun ensureIndexed(photos: List<MediaPhoto>) = mutex.withLock {
-        val scope = photos.take(MAX_PHOTOS)
+    /**
+     * Analyse les photos pas encore connues, parmi les [limit] plus récentes ; reprend là où elle
+     * s'est arrêtée. L'app en analyse [MAX_PHOTOS] à l'ouverture ; la tâche de fond ([IndexWorker]),
+     * pendant la recharge, va jusqu'à [MAX_BACKGROUND_PHOTOS].
+     */
+    suspend fun ensureIndexed(photos: List<MediaPhoto>, limit: Int = MAX_PHOTOS) = mutex.withLock {
+        val scope = photos.take(limit)
         total = scope.size
         load()
+        prune(photos)
         val missing = scope.filter { !embeddings.containsKey(it.id) }
         indexed = scope.size - missing.size
         // Les analyses relues du fichier comptent comme du neuf pour les écrans qui s'en servent.
@@ -166,54 +177,128 @@ class SearchIndex(private val context: Context) {
             // Traces de l'ancienne analyse (ML Kit) : remplacées par les vecteurs, place libérée.
             File(context.filesDir, OLD_LABELS_FILE).delete()
             File(context.filesDir, OLD_MLKIT_DIR).deleteRecursively()
-            runCatching {
-                val file = File(context.filesDir, EMBEDDINGS_FILE)
-                if (!file.exists()) return@runCatching
-                DataInputStream(file.inputStream().buffered()).use { input ->
-                    repeat(input.readInt()) {
-                        val id = input.readLong()
-                        embeddings[id] = FloatArray(input.readInt()) { input.readFloat() }
+            // Ancien format (nombre d'entrées en tête, fichier réécrit à chaque lot) : relu une fois.
+            val old = File(context.filesDir, OLD_EMBEDDINGS_FILE)
+            if (old.exists()) {
+                runCatching {
+                    DataInputStream(old.inputStream().buffered()).use { input ->
+                        repeat(input.readInt()) {
+                            val id = input.readLong()
+                            embeddings[id] = FloatArray(input.readInt()) { input.readFloat() }
+                        }
                     }
                 }
+            }
+            // Suite d'enregistrements ; une fin tronquée (coupure pendant un ajout) est ignorée,
+            // et le fichier réécrit proprement pour que les ajouts suivants restent lisibles.
+            var intact = true
+            val file = File(context.filesDir, EMBEDDINGS_FILE)
+            if (file.exists()) {
+                DataInputStream(file.inputStream().buffered()).use { input ->
+                    try {
+                        while (true) {
+                            val id = try { input.readLong() } catch (e: EOFException) { break }
+                            val size = input.readInt()
+                            if (size !in 0..MAX_DIM) { intact = false; break }
+                            embeddings[id] = FloatArray(size) { input.readFloat() }
+                        }
+                    } catch (e: IOException) {
+                        intact = false
+                    }
+                }
+            }
+            if (old.exists() || !intact) {
+                rewrite()
+                old.delete()
+            } else {
+                saved += embeddings.keys
             }
         }
     }
 
+    /**
+     * Ajoute au fichier les vecteurs pas encore écrits : 2 Ko par photo, au lieu de réécrire tout le
+     * fichier (20 Mo pour 10 000 photos) à chaque lot.
+     */
     private suspend fun save() {
-        val snapshot = embeddings.toMap()
+        val fresh = embeddings.filterKeys { it !in saved }
         version++
+        if (fresh.isEmpty()) return
         withContext(Dispatchers.IO) {
             runCatching {
-                // Écrit à côté puis renommé : une coupure en pleine écriture ne corrompt rien.
-                val tmp = File(context.filesDir, "$EMBEDDINGS_FILE.tmp")
-                DataOutputStream(tmp.outputStream().buffered()).use { out ->
-                    out.writeInt(snapshot.size)
-                    snapshot.forEach { (id, vector) ->
-                        out.writeLong(id)
-                        out.writeInt(vector.size)
-                        vector.forEach { out.writeFloat(it) }
-                    }
+                DataOutputStream(FileOutputStream(File(context.filesDir, EMBEDDINGS_FILE), true).buffered()).use { out ->
+                    fresh.forEach { (id, vector) -> writeRecord(out, id, vector) }
                 }
-                tmp.renameTo(File(context.filesDir, EMBEDDINGS_FILE))
+                saved += fresh.keys
             }
         }
     }
 
-    private companion object {
-        const val OLD_LABELS_FILE = "photo-labels-v3.json"
-        const val OLD_MLKIT_DIR = "com.google.mlkit.acceleration"
-        const val EMBEDDINGS_FILE = "photo-clip-v1.bin"
+    /**
+     * Oublie les photos qui ne sont plus dans la galerie (supprimées, masquées) quand elles pèsent
+     * plus de 10 % du fichier : celui-ci est alors réécrit sans elles.
+     */
+    private suspend fun prune(photos: List<MediaPhoto>) {
+        if (photos.isEmpty()) return
+        val present = photos.mapTo(HashSet(photos.size)) { it.id }
+        val gone = embeddings.keys.filter { it !in present }
+        if (gone.size < PRUNE_MIN || gone.size * 10 < embeddings.size) return
+        gone.forEach { id -> embeddings.remove(id); categoryCache.remove(id); conceptCache.remove(id) }
+        rewrite()
+    }
 
+    /** Réécrit tout le fichier, à côté puis renommé : une coupure en pleine écriture ne corrompt rien. */
+    private suspend fun rewrite() = withContext(Dispatchers.IO + NonCancellable) {
+        val snapshot = embeddings.toMap()
+        runCatching {
+            val tmp = File(context.filesDir, "$EMBEDDINGS_FILE.tmp")
+            DataOutputStream(tmp.outputStream().buffered()).use { out ->
+                snapshot.forEach { (id, vector) -> writeRecord(out, id, vector) }
+            }
+            if (tmp.renameTo(File(context.filesDir, EMBEDDINGS_FILE))) {
+                saved.clear()
+                saved += snapshot.keys
+            }
+        }
+    }
+
+    private fun writeRecord(out: DataOutputStream, id: Long, vector: FloatArray) {
+        out.writeLong(id)
+        out.writeInt(vector.size)
+        vector.forEach { out.writeFloat(it) }
+    }
+
+    companion object {
         /** Les photos les plus récentes : quelques minutes d'analyse sur un téléphone récent. */
         const val MAX_PHOTOS = 2000
 
+        /**
+         * Pendant la recharge : toute la galerie, jusqu'à 10 000 photos (20 Mo de vecteurs en
+         * mémoire et sur le disque).
+         */
+        const val MAX_BACKGROUND_PHOTOS = 10_000
+
+        @Volatile
+        private var instance: SearchIndex? = null
+
+        /** Un seul index pour l'app et la tâche de fond : ils ne s'écrivent jamais dessus. */
+        fun get(context: Context): SearchIndex =
+            instance ?: synchronized(this) { instance ?: SearchIndex(context.applicationContext).also { instance = it } }
+
+        private const val OLD_LABELS_FILE = "photo-labels-v3.json"
+        private const val OLD_MLKIT_DIR = "com.google.mlkit.acceleration"
+        private const val OLD_EMBEDDINGS_FILE = "photo-clip-v1.bin"
+        private const val EMBEDDINGS_FILE = "photo-clip-v2.bin"
+        private const val MAX_DIM = 4096
+        private const val PRUNE_MIN = 50
+
         /** Sauvegarde par lots : le fichier des vecteurs pèse 2 Ko par photo. */
-        const val SAVE_EVERY = 50
+        private const val SAVE_EVERY = 50
 
         /** Assez grand pour que le bord court dépasse 256 px, la taille d'entrée de MobileCLIP. */
-        const val ANALYSIS_SIZE = 512
+        private const val ANALYSIS_SIZE = 512
 
         /** Une seule lettre désignerait la moitié du vocabulaire. */
-        const val MIN_QUERY_LENGTH = 2
+        private const val MIN_QUERY_LENGTH = 2
     }
 }

@@ -1,5 +1,7 @@
 package com.vista.photoeditor.ui.viewer
 
+import androidx.compose.runtime.produceState
+import androidx.compose.foundation.lazy.items
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -130,6 +132,9 @@ fun ViewerScreen(
     onOpenWith: (Uri) -> Unit,
     /** Déplace la photo dans le dossier masqué. */
     onHide: (MediaPhoto) -> Unit,
+    /** Photos qui ressemblent à celle affichée, pour la rangée « Photos similaires ». */
+    similarTo: suspend (MediaPhoto) -> List<MediaPhoto> = { emptyList() },
+    onOpenPhoto: (Long) -> Unit = {},
     /** Photo affichée : l'album s'en sert pour se replacer au retour. */
     onPhotoShown: (Long) -> Unit = {},
 ) {
@@ -238,6 +243,10 @@ fun ViewerScreen(
                                     onClick = { menu = false; onOpenWith(current.uri) },
                                 )
                                 DropdownMenuItem(
+                                    text = { Text("Photos similaires", fontFamily = Kanit) },
+                                    onClick = { menu = false; showInfo = true },
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Masquer", fontFamily = Kanit) },
                                     onClick = { menu = false; onHide(current) },
                                 )
@@ -336,6 +345,10 @@ fun ViewerScreen(
                 InfoRow("Dimensions", "${current.displayWidth} × ${current.displayHeight} px")
                 InfoRow("Taille", String.format(Locale.FRENCH, "%.1f Mo", current.sizeBytes / 1_048_576f))
                 InfoRow("Format", current.mimeType.substringAfter('/').uppercase())
+                SimilarRow(current, similarTo) { id ->
+                    showInfo = false
+                    onOpenPhoto(id)
+                }
             }
         }
     }
@@ -567,6 +580,32 @@ private fun ToolbarButton(icon: ImageVector, description: String, highlighted: B
             tint = if (highlighted) VistaColors.OnPrimary else VistaColors.Text,
             modifier = Modifier.size(22.dp),
         )
+    }
+}
+
+/** Rangée des photos qui ressemblent à [photo] ; rien si elle n'en a pas (ou pas encore analysée). */
+@Composable
+private fun SimilarRow(photo: MediaPhoto, similarTo: suspend (MediaPhoto) -> List<MediaPhoto>, onOpen: (Long) -> Unit) {
+    val similar by produceState<List<MediaPhoto>?>(null, photo.id) { value = similarTo(photo) }
+    val list = similar ?: return
+    Spacer(Modifier.height(20.dp))
+    Text("Photos similaires", fontFamily = Kanit, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = VistaColors.Text)
+    Spacer(Modifier.height(10.dp))
+    if (list.isEmpty()) {
+        Text("Aucune photo ne ressemble à celle-ci.", fontFamily = Kanit, fontSize = 13.sp, color = VistaColors.Muted)
+        return
+    }
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(list, key = { it.id }) { p ->
+            PhotoImage(
+                p.uri,
+                Modifier
+                    .size(84.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .plainClickable { onOpen(p.id) },
+                contentDescription = p.name,
+            )
+        }
     }
 }
 

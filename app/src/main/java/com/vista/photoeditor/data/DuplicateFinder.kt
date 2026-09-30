@@ -26,6 +26,12 @@ object DuplicateFinder {
     const val CLOSE_BURST = 0.85f
     const val CLOSE_GAP_MILLIS = 10_000L
 
+    /** Jusque-là, les doublons se cherchent en comparant toutes les paires. */
+    private const val BRUTE_FORCE_MAX = 1500
+    private const val HASH_TABLES = 8
+    private const val HASH_BITS = 10
+    private const val HASH_SEED = 20260929L
+
     /** Une rafale ne dérive pas : chaque prise reste proche de la première. */
     const val BURST_ANCHOR = 0.85f
 
@@ -70,9 +76,39 @@ object DuplicateFinder {
         }
 
         // Doublons : à n'importe quelle date.
-        for (i in items.indices) {
-            for (j in i + 1 until items.size) {
-                if (find(i) != find(j) && dot(items[i].vector, items[j].vector) >= SAME_PHOTO) union(i, j)
+        if (items.size <= BRUTE_FORCE_MAX) {
+            for (i in items.indices) {
+                for (j in i + 1 until items.size) {
+                    if (find(i) != find(j) && dot(items[i].vector, items[j].vector) >= SAME_PHOTO) union(i, j)
+                }
+            }
+        } else {
+            // Grande galerie : comparer toutes les paires coûterait n² (50 millions à 10 000 photos).
+            // Chaque photo reçoit une empreinte par table, le côté de [HASH_BITS] plans tirés au hasard
+            // où tombe son vecteur ; deux copies (similarité ≥ 0,98, angle ≤ 11,5°) partagent la même
+            // empreinte dans une table avec une probabilité de 0,52, dans au moins une des
+            // [HASH_TABLES] tables avec 0,997. Seules les photos d'une même empreinte sont comparées.
+            val dim = items.first().vector.size
+            val random = java.util.Random(HASH_SEED)
+            repeat(HASH_TABLES) {
+                val planes = Array(HASH_BITS) { FloatArray(dim) { random.nextGaussian().toFloat() } }
+                val buckets = HashMap<Int, MutableList<Int>>()
+                for (i in items.indices) {
+                    val v = items[i].vector
+                    if (v.size != dim) continue
+                    var key = 0
+                    for (b in planes.indices) if (dot(planes[b], v) >= 0f) key = key or (1 shl b)
+                    buckets.getOrPut(key) { mutableListOf() } += i
+                }
+                for (bucket in buckets.values) {
+                    for (x in bucket.indices) {
+                        for (y in x + 1 until bucket.size) {
+                            val i = bucket[x]
+                            val j = bucket[y]
+                            if (find(i) != find(j) && dot(items[i].vector, items[j].vector) >= SAME_PHOTO) union(i, j)
+                        }
+                    }
+                }
             }
         }
 

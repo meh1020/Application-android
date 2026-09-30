@@ -77,6 +77,32 @@ class DuplicateFinderTest {
     }
 
     @Test
+    fun largeGalleryFindsEveryCopyQuickly() {
+        // 6 000 photos différentes (dates éloignées : pas de rafales), dont 100 copies légèrement
+        // retouchées (similarité 0,985) : toutes retrouvées, sans comparer toutes les paires.
+        val random = java.util.Random(7)
+        fun unit(v: FloatArray): FloatArray { val n = sqrt(v.sumOf { (it * it).toDouble() }).toFloat(); return FloatArray(v.size) { v[it] / n } }
+        fun randomVector() = unit(FloatArray(512) { random.nextGaussian().toFloat() })
+        val originals = List(6000) { randomVector() }
+        val copies = (0 until 100).map { k ->
+            val base = originals[k * 37]
+            val noise = randomVector()
+            // Composante orthogonale au vecteur d'origine, pour une similarité exacte.
+            val d = base.indices.sumOf { (base[it] * noise[it]).toDouble() }.toFloat()
+            val ortho = unit(FloatArray(512) { noise[it] - d * base[it] })
+            near(base, ortho, 0.985f)
+        }
+        val photos = originals.mapIndexed { i, v -> candidate(i.toLong(), i * 3_600L, v) } +
+            copies.mapIndexed { k, v -> candidate(100_000L + k, 10_000_000L + k * 3_600L, v) }
+        val start = System.nanoTime()
+        val groups = DuplicateFinder.groups(photos)
+        val millis = (System.nanoTime() - start) / 1_000_000
+        assertEquals(100, groups.size)
+        assertTrue(groups.all { g -> g.size == 2 && g.contains(100_000L + (g.first { it < 100_000L } / 37)) })
+        assertTrue("$millis ms", millis < 5_000)
+    }
+
+    @Test
     fun unanalysedPhotosAreIgnored() {
         assertTrue(DuplicateFinder.groups(listOf(candidate(1, 0, FloatArray(0)), candidate(2, 1, FloatArray(0)))).isEmpty())
     }

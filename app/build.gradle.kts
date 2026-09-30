@@ -84,6 +84,8 @@ dependencies {
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     // Compréhension d'image (MobileCLIP) : catégories, souvenirs et recherche par contenu.
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
+    // Analyse de toute la galerie pendant la recharge.
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     testImplementation("junit:junit:4.13.2")
 }

@@ -364,6 +364,8 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 onDelete = { launchRequest(MediaRepository.trashRequest(context, listOf(it), trash = true)) },
                 onToggleFavorite = { launchRequest(MediaRepository.favoriteRequest(context, listOf(it.uri), !it.isFavorite)) },
                 onHide = { hidePhotos(listOf(it)) },
+                similarTo = gallery::similarTo,
+                onOpenPhoto = { navigator.push(Screen.Viewer(MediaRepository.ALL_KEY, it)) },
                 onOpenWith = { uri ->
                     val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "image/*")
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

@@ -57,7 +57,13 @@ lui coller des étiquettes isolées :
 - **Correction à la main** — dans une catégorie, sélectionner des photos puis « Retirer de la
   catégorie » : elles n'y reviennent plus (la photo elle-même n'est pas supprimée).
 - **Analyse en arrière-plan** dès l'ouverture de l'app (2 000 photos les plus récentes), reprise là
-  où elle s'est arrêtée.
+  où elle s'est arrêtée ; et, une fois par jour pendant la recharge, de **toute la galerie**
+  (jusqu'à 10 000 photos) par une tâche WorkManager, app fermée. Interrompue au débranchement, elle
+  reprend à la recharge suivante. Les vecteurs sont ajoutés au fichier au fil de l'analyse (2 Ko par
+  photo) au lieu de le réécrire à chaque lot. Mesuré sur l'émulateur : 777 photos en 75 s.
+- **Doublons sur une grande galerie** : au-delà de 1 500 photos, les copies se cherchent par
+  empreintes (8 tables de 10 plans aléatoires) plutôt qu'en comparant toutes les paires ; test :
+  100 copies cachées parmi 6 100 photos, toutes retrouvées en 0,5 s.
 - Mesuré sur trois jeux (Wikimedia Commons, photos Unsplash au style d'un téléphone, photos de
   l'émulateur) ; méthode, chiffres et pistes écartées dans `tools/clip/`.
 
@@ -82,6 +88,8 @@ Carte d'en-tête *« Le meilleur de \<mois\> »*, grille en quinconce avec tuile
 ### 🔭 Visionneuse
 Carrousel 3D avec photos voisines floutées et décalées en perspective, panneau d'informations (date, lieu, appareil via ExifInterface), favoris, actions **Modifier / Partager / Supprimer**, bande de miniatures rondes en bas.
 
+**Photos similaires** (menu ⋮ ou panneau d'informations) : jusqu'à 12 photos qui ressemblent à celle affichée, d'après les vecteurs MobileCLIP, sans calcul supplémentaire. Seuil 0,55, réglé sur les 730 photos de test : 5 voisines par photo en moyenne, dont 84 % du même sujet.
+
 ### ✏️ Éditeur
 - **Filtres** — 29 filtres rangés en familles, avec curseur d'intensité :
   - **Couleur** : Vivid, Été, Portrait, Aurora, Golden, Arctic, Minuit, Pastel ;
@@ -103,6 +111,8 @@ Carrousel 3D avec photos voisines floutées et décalées en perspective, pannea
 
 ### 🔍 Recherche
 Barre de recherche avec, en pastilles, les sujets les plus fréquents de vos photos. Recherche par nom d'album, mois, date, nom de fichier **ou** contenu (« chien », « robe », « coucher de soleil »…) : environ 380 concepts nommés en français, reconnus par MobileCLIP à partir des vecteurs déjà calculés pour les catégories. Les photos trouvées par leur contenu viennent en tête, de la plus ressemblante à la moins ressemblante.
+
+**Recherche combinée** : une année ou un mois dans la requête filtre les résultats (« plage 2023 », « chien juillet », « neige janvier 2024 ») ; le reste se cherche comme d'habitude.
 
 Les recherches au pluriel fonctionnent (« livres »), et une recherche qui désigne une catégorie d'Explorer (« livre », « plage », « fleurs ») ramène aussi ses photos.
 
