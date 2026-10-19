@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.runtime.SideEffect
@@ -71,6 +72,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.rememberAsyncImagePainter
@@ -83,6 +85,7 @@ import com.vista.photoeditor.ui.components.GlassLabel
 import com.vista.photoeditor.ui.components.PhotoImage
 import com.vista.photoeditor.ui.components.PrimaryFab
 import com.vista.photoeditor.ui.components.ScreenHeader
+import com.vista.photoeditor.ui.components.VideoBadge
 import com.vista.photoeditor.ui.components.GlassBackdrop
 import com.vista.photoeditor.ui.components.GlassTopEdge
 import com.vista.photoeditor.ui.components.liquidGlass
@@ -149,7 +152,8 @@ fun AlbumScreen(
             onReturnHandled()
         }
     }
-    val showAlbumName = album?.key == MediaRepository.ALL_KEY || album?.key == MediaRepository.FAVORITES_KEY
+    val showAlbumName = album?.key == MediaRepository.ALL_KEY || album?.key == MediaRepository.FAVORITES_KEY ||
+        album?.key == MediaRepository.VIDEOS_KEY
 
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -368,6 +372,8 @@ private fun GridPhoto(
             Modifier
                 .align(Alignment.BottomStart)
                 .padding(10.dp)
+                // Sur une vidéo, la durée occupe le coin droit : le lieu lui laisse la place.
+                .then(if (photo.isVideo) Modifier.widthIn(max = 84.dp) else Modifier)
                 .clip(CircleShape)
                 .background(Color.Black.copy(alpha = 0.42f))
                 .padding(horizontal = 9.dp, vertical = 4.dp),
@@ -375,8 +381,9 @@ private fun GridPhoto(
         ) {
             Icon(Icons.Outlined.Place, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
             Spacer(Modifier.width(4.dp))
-            Text(label, color = Color.White, fontFamily = Kanit, fontSize = 11.sp, maxLines = 1)
+            Text(label, color = Color.White, fontFamily = Kanit, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        if (photo.isVideo) VideoBadge(photo.durationMillis, Modifier.align(Alignment.BottomEnd), padding = 10.dp)
         val overlay by animateFloatAsState(if (selected) 0.22f else 0f, tween(200), label = "tileOverlay")
         if (overlay > 0f) {
             Box(

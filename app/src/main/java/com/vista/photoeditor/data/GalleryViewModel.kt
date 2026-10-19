@@ -50,6 +50,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         application.contentResolver.registerContentObserver(MediaRepository.collection, true, observer)
+        application.contentResolver.registerContentObserver(MediaRepository.videoCollection, true, observer)
         IndexWorker.schedule(application)
         refresh()
     }
@@ -130,7 +131,8 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         }
         val result = withContext(Dispatchers.Default) {
             val byId = snapshot.associateBy { it.id }
-            val candidates = snapshot.mapNotNull { photo ->
+            // Une vidéo n'est jamais proposée comme doublon : son vecteur ne résume qu'une image.
+            val candidates = snapshot.filterNot { it.isVideo }.mapNotNull { photo ->
                 searchIndex.vectorOf(photo.id)?.let { vector ->
                     DuplicateFinder.Candidate(
                         photo.id, photo.dateMillis, vector,
@@ -151,7 +153,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         val target = searchIndex.vectorOf(photo.id) ?: return@withContext emptyList()
         val snapshot = photos
         val byId = snapshot.associateBy { it.id }
-        val candidates = snapshot.mapNotNull { p -> searchIndex.vectorOf(p.id)?.let { p.id to it } }
+        val candidates = snapshot.filterNot { it.isVideo }.mapNotNull { p -> searchIndex.vectorOf(p.id)?.let { p.id to it } }
         SimilarPhotos.rank(photo.id, target, candidates).mapNotNull(byId::get)
     }
 
@@ -166,7 +168,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     }.also { sharpness[photo.id] = it }
 
     fun album(key: String): Album? = when {
-        key == MediaRepository.ALL_KEY -> Album(MediaRepository.ALL_KEY, "Toutes les photos", photos)
+        key == MediaRepository.ALL_KEY -> Album(MediaRepository.ALL_KEY, "Récents", photos)
         key.startsWith(SmartAlbums.CATEGORY_PREFIX) -> categories().find { it.key == key }
         key.startsWith(SmartAlbums.MEMORY_PREFIX) -> memories().find { it.key == key }
         else -> albums.find { it.key == key }

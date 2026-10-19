@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material3.Icon
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -44,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vista.photoeditor.data.MediaPhoto
+import com.vista.photoeditor.ui.components.DateLabels
 import com.vista.photoeditor.ui.components.PhotoImage
 import com.vista.photoeditor.ui.components.ScreenHeader
 import com.vista.photoeditor.ui.components.plainClickable
@@ -72,7 +75,7 @@ fun TrashScreen(
         Column(Modifier.fillMaxSize()) {
             ScreenHeader("Corbeille", onBack, Icons.AutoMirrored.Filled.KeyboardArrowLeft)
             Text(
-                "Les photos sont supprimées définitivement après 30 jours.",
+                "Les photos et vidéos sont supprimées définitivement après 30 jours.",
                 fontFamily = Kanit,
                 fontSize = 14.sp,
                 color = VistaColors.Muted,
@@ -89,6 +92,7 @@ fun TrashScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    val now = System.currentTimeMillis()
                     items(photos, key = { it.id }) { photo ->
                         val selected = photo.id in validSelection
                         Box(
@@ -99,6 +103,7 @@ fun TrashScreen(
                                 .plainClickable { selection = if (selected) selection - photo.id else selection + photo.id }
                         ) {
                             PhotoImage(photo.uri, Modifier.fillMaxSize())
+                            TileFooter(photo, now, Modifier.align(Alignment.BottomCenter))
                             if (selected) Box(Modifier.fillMaxSize().background(VistaColors.Primary.copy(alpha = 0.25f)))
                             Box(
                                 Modifier
@@ -141,6 +146,42 @@ fun TrashScreen(
                     onDeleteForever(targets.map { it.uri }); selection = emptySet()
                 }
             }
+        }
+    }
+}
+
+/**
+ * Bas de la vignette, comme « Supprimés récemment » sur iOS : les jours qu'il reste avant la
+ * suppression définitive, et la durée d'une vidéo.
+ */
+@Composable
+private fun TileFooter(photo: MediaPhoto, now: Long, modifier: Modifier) {
+    val days = DateLabels.daysLeft(photo.expiresMillis, now)
+    if (days == null && !photo.isVideo) return
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))))
+            .padding(start = 7.dp, end = 6.dp, top = 12.dp, bottom = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            when (days) {
+                null -> ""
+                1 -> "1 jour"
+                else -> "$days jours"
+            },
+            // Les derniers jours en rouge clair, lisible sur la photo.
+            color = if (days != null && days <= 3) Color(0xFFFF8A80) else Color.White,
+            fontFamily = Kanit,
+            fontWeight = FontWeight.Medium,
+            fontSize = 11.sp,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        if (photo.isVideo) {
+            Icon(Icons.Filled.PlayArrow, contentDescription = "Vidéo", tint = Color.White, modifier = Modifier.size(12.dp))
+            Text(DateLabels.duration(photo.durationMillis), color = Color.White, fontFamily = Kanit, fontSize = 11.sp, maxLines = 1)
         }
     }
 }

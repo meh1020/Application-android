@@ -2,6 +2,9 @@ package com.vista.photoeditor.ui.viewer
 
 import androidx.compose.runtime.produceState
 import androidx.compose.foundation.lazy.items
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -48,6 +51,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
@@ -61,10 +65,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -82,11 +88,19 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import coil3.compose.rememberAsyncImagePainter
 import com.vista.photoeditor.data.MediaPhoto
 import com.vista.photoeditor.ui.components.ActionCircle
@@ -114,6 +128,9 @@ import kotlin.math.max
 private const val MAX_ZOOM = 5f
 private const val DOUBLE_TAP_ZOOM = 2.5f
 private const val DOUBLE_TAP_DELAY_MS = 280L
+
+/** Pendant la lecture d'une vidéo, délai sans toucher avant que les commandes s'effacent. */
+private const val CONTROLS_HIDE_DELAY_MS = 3_000L
 
 private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
 
@@ -158,17 +175,68 @@ fun ViewerScreen(
     val dismissing by remember { derivedStateOf { dismissProgress.floatValue > 0.01f } }
     val current = photos[pagerState.currentPage.coerceIn(0, photos.lastIndex)]
 
+    // La vidéo affichée se lance d'elle-même ; passer à une photo l'arrête.
+    val playback = rememberVideoPlayback()
+    LaunchedEffect(current.id, current.isVideo) {
+        if (current.isVideo) playback.open(current) else playback.stop()
+    }
+    // App en arrière-plan : la vidéo attend qu'on revienne.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { playback.pause() }
+
+    // Comme dans un lecteur vidéo : pendant la lecture, les commandes s'effacent au bout de
+    // quelques secondes sans toucher l'écran ; une tape les fait revenir.
+    var interactions by remember { mutableIntStateOf(0) }
+    LaunchedEffect(current.id, playback.isPlaying, playback.isScrubbing, immersive, interactions) {
+        if (current.isVideo && playback.isPlaying && !playback.isScrubbing && !immersive) {
+            delay(CONTROLS_HIDE_DELAY_MS)
+            immersive = true
+        }
+    }
+    // Vidéo finie : les commandes reviennent pour la relancer.
+    LaunchedEffect(playback.isEnded) { if (playback.isEnded) immersive = false }
+
+    // Plein écran paysage à la demande ; l'app reprend son orientation libre en quittant la vidéo.
+    val activity = LocalContext.current as? Activity
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    LaunchedEffect(current.isVideo) {
+        if (!current.isVideo) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+    DisposableEffect(activity) {
+        onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
+
+    // Vidéo en plein écran (commandes masquées, ou paysage) : les barres du système s'effacent
+    // aussi ; un glissé depuis le bord les fait réapparaître un instant.
+    val hideSystemBars = current.isVideo && (immersive || isLandscape)
+    val view = LocalView.current
+    DisposableEffect(hideSystemBars, activity) {
+        val window = activity?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        if (controller != null) {
+            if (hideSystemBars) {
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+
     BackHandler(enabled = immersive) { immersive = false }
 
     val latestPhotoShown by rememberUpdatedState(onPhotoShown)
     LaunchedEffect(pagerState.currentPage) {
         zoomed = false
-        photos.getOrNull(pagerState.currentPage)?.let { latestPhotoShown(it.id) }
-        rowState.animateScrollToItem((pagerState.currentPage - 2).coerceAtLeast(0))
+        val shown = photos.getOrNull(pagerState.currentPage)
+        shown?.let { latestPhotoShown(it.id) }
+        // Sur une vidéo, la pellicule n'est pas à l'écran : elle se replacera au retour sur une photo.
+        if (shown?.isVideo == false) rowState.animateScrollToItem((pagerState.currentPage - 2).coerceAtLeast(0))
     }
 
     val chromeVisible = !immersive && !dismissing
-    val blackout = animateFloatAsState(if (immersive) 1f else 0f, tween(280), label = "blackout")
+    // Une vidéo se regarde sur fond noir, comme dans un lecteur ; une photo, seulement en plein écran.
+    val blackout = animateFloatAsState(if (immersive || current.isVideo) 1f else 0f, tween(280), label = "blackout")
 
     // Façon Liquid Glass : la photo occupe tout l'écran, les barres de verre flottent par-dessus.
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -202,6 +270,7 @@ fun ViewerScreen(
             ZoomablePhoto(
                 photo = photos[page],
                 isCurrent = isCurrent,
+                video = if (isCurrent && photos[page].isVideo) playback else null,
                 corner = 0.dp,
                 onTap = { immersive = !immersive },
                 onZoomChanged = { if (isCurrent) zoomed = it },
@@ -246,10 +315,13 @@ fun ViewerScreen(
                                     text = { Text("Photos similaires", fontFamily = Kanit) },
                                     onClick = { menu = false; showInfo = true },
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("Masquer", fontFamily = Kanit) },
-                                    onClick = { menu = false; onHide(current) },
-                                )
+                                // Le dossier masqué ne prend que des photos.
+                                if (!current.isVideo) {
+                                    DropdownMenuItem(
+                                        text = { Text("Masquer", fontFamily = Kanit) },
+                                        onClick = { menu = false; onHide(current) },
+                                    )
+                                }
                             }
                         }
                     },
@@ -257,8 +329,41 @@ fun ViewerScreen(
             }
         }
 
+        // Vidéo : lecteur classique, bouton de lecture au centre et commandes en bas, sur fond noir.
         AnimatedVisibility(
-            visible = chromeVisible,
+            visible = chromeVisible && current.isVideo,
+            enter = fadeIn(tween(220)),
+            exit = fadeOut(tween(160)),
+            modifier = Modifier.align(Alignment.Center),
+        ) {
+            VideoCenterControls(playback, onInteract = { interactions++ })
+        }
+        AnimatedVisibility(
+            visible = chromeVisible && current.isVideo,
+            enter = fadeIn(tween(220)),
+            exit = fadeOut(tween(160)),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            VideoControls(
+                playback = playback,
+                isLandscape = isLandscape,
+                onToggleLandscape = {
+                    interactions++
+                    activity?.requestedOrientation = if (isLandscape) {
+                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    } else {
+                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    }
+                },
+                onShare = { onShare(current.uri) },
+                onInfo = { showInfo = true },
+                onDelete = { onDelete(current.uri) },
+                onInteract = { interactions++ },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = chromeVisible && !current.isVideo,
             enter = fadeIn(tween(220)),
             exit = fadeOut(tween(160)),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -297,6 +402,16 @@ fun ViewerScreen(
                                     .plainClickable { scope.launch { pagerState.animateScrollToPage(index) } }
                             ) {
                                 PhotoImage(photo.uri, Modifier.fillMaxSize())
+                                if (photo.isVideo) {
+                                    Icon(
+                                        Icons.Filled.PlayArrow,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(18.dp),
+                                    )
+                                }
                             }
                         }
                     }
@@ -342,6 +457,7 @@ fun ViewerScreen(
                 Spacer(Modifier.height(16.dp))
                 InfoRow("Date", DateLabels.full(current.dateMillis))
                 InfoRow("Album", current.bucketName)
+                if (current.isVideo) InfoRow("Durée", DateLabels.duration(current.durationMillis))
                 InfoRow("Dimensions", "${current.displayWidth} × ${current.displayHeight} px")
                 InfoRow("Taille", String.format(Locale.FRENCH, "%.1f Mo", current.sizeBytes / 1_048_576f))
                 InfoRow("Format", current.mimeType.substringAfter('/').uppercase())
@@ -363,6 +479,8 @@ fun ViewerScreen(
 private fun ZoomablePhoto(
     photo: MediaPhoto,
     isCurrent: Boolean,
+    /** Lecteur, pour la vidéo affichée : son image vient se poser sur l'affiche. */
+    video: VideoPlayback?,
     corner: Dp,
     onTap: () -> Unit,
     onZoomChanged: (Boolean) -> Unit,
@@ -370,9 +488,11 @@ private fun ZoomablePhoto(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val playing = video?.takeIf { it.uri == photo.uri }
+    // Pour une vidéo, la vignette sert d'affiche jusqu'à la première image.
     val painter = rememberAsyncImagePainter(model = photo.uri)
     val decoded = painter.intrinsicSize
-    val ratio = if (decoded.isSpecified && decoded.width > 0f && decoded.height > 0f) {
+    val ratio = playing?.aspectRatio ?: if (decoded.isSpecified && decoded.width > 0f && decoded.height > 0f) {
         decoded.width / decoded.height
     } else {
         (photo.displayWidth.takeIf { it > 0 } ?: 3).toFloat() / (photo.displayHeight.takeIf { it > 0 } ?: 4)
@@ -558,6 +678,22 @@ private fun ZoomablePhoto(
                         .fillMaxSize()
                         .background(VistaColors.SurfaceSoft),
                 )
+                if (playing != null) {
+                    VideoSurface(playing, Modifier.fillMaxSize())
+                    if (playing.hasError) {
+                        Text(
+                            "Lecture impossible",
+                            color = Color.White,
+                            fontFamily = Kanit,
+                            fontSize = 14.sp,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.5f))
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                        )
+                    }
+                }
             }
         }
     }

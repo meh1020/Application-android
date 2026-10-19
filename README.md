@@ -18,7 +18,8 @@
 
 | Domaine | Ce que Vista propose |
 |---|---|
-| 🖼️ **Galerie** | Parcours par albums animés, grille en quinconce, sélection multiple, tri par date |
+| 🖼️ **Galerie** | Photos **et vidéos**, parcours par albums animés, grille en quinconce, sélection multiple, tri par date |
+| 🎬 **Vidéos** | Toutes les vidéos du téléphone, lues dans un lecteur plein écran classique : lecture/pause, ±10 s, barre de progression, son, paysage ; album « Vidéos » |
 | 🔍 **Recherche intelligente** | Par nom, album, date *ou* contenu (« robe », « chien », « coucher de soleil »), hors ligne, sur 2 000 photos |
 | 🪄 **Explorer (IA)** | 19 catégories remplies toutes seules par MobileCLIP (Personnes, Plages, Vêtements…), souvenirs automatiques, doublons et rafales à trier |
 | ✏️ **Éditeur non destructif** | 29 filtres en 4 familles, 10 réglages fins dont ombres et hautes lumières, retouche automatique, recadrage libre ou verrouillé, redressement ±45°, annuler/rétablir |
@@ -88,6 +89,8 @@ Carte d'en-tête *« Le meilleur de \<mois\> »*, grille en quinconce avec tuile
 ### 🔭 Visionneuse
 Carrousel 3D avec photos voisines floutées et décalées en perspective, panneau d'informations (date, lieu, appareil via ExifInterface), favoris, actions **Modifier / Partager / Supprimer**, bande de miniatures rondes en bas.
 
+**Vidéos** : toutes celles du téléphone (appareil photo, WhatsApp, téléchargements…), lues par Media3 ExoPlayer dans un **lecteur plein écran classique**, comme dans une galerie : fond noir, gros bouton lecture/pause au centre entre « reculer » et « avancer » de 10 s (« revoir » à la fin), barre de progression à faire glisser avec temps écoulé et durée, puis son, partager, informations, supprimer et **plein écran paysage**. Pendant la lecture, les commandes et les barres du système s'effacent au bout de 3 s ; une tape les fait revenir. La vidéo affichée se lance d'elle-même, une seule à la fois, et s'arrête quand on passe à une photo ou que l'app passe en arrière-plan ; tourner l'écran ne l'interrompt pas. Zoom, glissade de fermeture et zoom « héros » vers la grille marchent comme pour une photo. Pas encore de retouche ni de dossier masqué pour les vidéos (« Ouvrir avec… » les confie à une autre app).
+
 **Photos similaires** (menu ⋮ ou panneau d'informations) : jusqu'à 12 photos qui ressemblent à celle affichée, d'après les vecteurs MobileCLIP, sans calcul supplémentaire. Seuil 0,55, réglé sur les 730 photos de test : 5 voisines par photo en moyenne, dont 84 % du même sujet.
 
 ### ✏️ Éditeur
@@ -119,7 +122,7 @@ Les recherches au pluriel fonctionnent (« livres »), et une recherche qui dés
 Mesurée sur les mêmes 676 photos et 57 requêtes que l'ancienne recherche par mots-clés ML Kit : précision 83 % contre 77 %, deux fois plus de photos retrouvées (rappel 68 % contre 33 %), 60 intrus contre 285. Une fois la vérité du test corrigée à l'œil (des intrus montraient bien le sujet), 90 % de précision et 76 % de rappel.
 
 ### 🗑️ Corbeille
-Galerie des éléments supprimés avec options **Restaurer** ou **Supprimer définitivement**.
+Photos et vidéos supprimées, avec options **Restaurer** ou **Supprimer définitivement**. Comme « Supprimés récemment » sur iOS, chaque vignette indique les jours restants avant la suppression définitive par Android (en rouge les trois derniers) et la durée des vidéos.
 
 ---
 
@@ -179,7 +182,8 @@ app/src/main/java/com/vista/photoeditor/
 | `io.coil-kt.coil3:coil-compose:3.0.4` | Chargement & mise en cache asynchrone des images |
 | `dev.chrisbanes.haze:haze:1.2.2` | Flou d'arrière-plan *liquid glass* (Android 12+) |
 | `androidx.exifinterface:exifinterface:1.3.7` | Lecture/écriture métadonnées JPEG (date, GPS, appareil) |
-| `com.microsoft.onnxruntime:onnxruntime-android:1.30.0` | Exécution de MobileCLIP (catégories) |
+| `com.microsoft.onnxruntime:onnxruntime-android:1.22.0` | Exécution de MobileCLIP (catégories) |
+| `androidx.media3:media3-exoplayer:1.5.1` | Lecture des vidéos dans la visionneuse |
 
 ---
 
@@ -198,6 +202,7 @@ app/src/main/java/com/vista/photoeditor/
 | Permission | API cible | Usage |
 |---|---|---|
 | `READ_MEDIA_IMAGES` | Android 13+ (API 33+) | Accès aux photos (accès partiel géré sur Android 14+) |
+| `READ_MEDIA_VIDEO` | Android 13+ (API 33+) | Accès aux vidéos (demandé une fois à qui avait déjà autorisé les photos) |
 | `READ_EXTERNAL_STORAGE` | Android 11–12 (API 30–32) | Accès aux photos sur anciens builds |
 | `WRITE_EXTERNAL_STORAGE` | Android 11 (API 30) | Export dans `Pictures/Vista` |
 | `CAMERA` | Tous | Capture via raccourci appareil photo |

@@ -53,6 +53,7 @@ import com.vista.photoeditor.data.SearchQuery
 import com.vista.photoeditor.ui.components.DateLabels
 import com.vista.photoeditor.ui.components.PhotoImage
 import com.vista.photoeditor.ui.components.ScreenHeader
+import com.vista.photoeditor.ui.components.VideoBadge
 import com.vista.photoeditor.ui.components.liquidGlass
 import com.vista.photoeditor.ui.components.plainClickable
 import com.vista.photoeditor.ui.components.sharedPhoto
@@ -233,6 +234,7 @@ fun SearchScreen(
                         .plainClickable { onOpenPhoto(photo.id) }
                 ) {
                     PhotoImage(photo.uri, Modifier.fillMaxSize())
+                    if (photo.isVideo) VideoBadge(photo.durationMillis, Modifier.align(Alignment.BottomEnd), padding = 5.dp)
                 }
             }
         }

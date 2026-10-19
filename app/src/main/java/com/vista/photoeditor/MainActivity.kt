@@ -51,6 +51,7 @@ import com.vista.photoeditor.data.GalleryViewModel
 import com.vista.photoeditor.data.MediaPermissions
 import com.vista.photoeditor.data.MediaRepository
 import com.vista.photoeditor.data.SmartAlbums
+import com.vista.photoeditor.data.VideoFrames
 import com.vista.photoeditor.editor.EditorViewModel
 import com.vista.photoeditor.editor.ImageIO
 import com.vista.photoeditor.ui.Navigator
@@ -61,6 +62,7 @@ import com.vista.photoeditor.ui.components.AppleMotion
 import com.vista.photoeditor.ui.components.GlassScope
 import com.vista.photoeditor.ui.components.LocalNavAnimatedVisibilityScope
 import com.vista.photoeditor.ui.components.LocalSharedTransitionScope
+import com.vista.photoeditor.ui.components.installImageLoader
 import com.vista.photoeditor.ui.duplicates.DuplicatesScreen
 import com.vista.photoeditor.ui.editor.EditorScreen
 import com.vista.photoeditor.ui.explore.ExploreScreen
@@ -100,6 +102,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        installImageLoader()
         setContent {
             VistaTheme {
                 VistaApp(navigator, gallery, editor)
@@ -141,6 +144,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Type annoncé au partage : celui de tous les éléments s'ils sont du même genre, n'importe lequel sinon. */
+internal fun shareType(types: List<String>): String = types.distinct().singleOrNull() ?: "*/*"
+
 /** Onglets de la barre de l'accueil. */
 private const val HOME_TAB = 0
 private const val EXPLORE_TAB = 1
@@ -162,6 +168,15 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
         gallery.onPermissionsChanged()
     }
     val requestPermission = { permissionLauncher.launch(MediaPermissions.request) }
+
+    // Accès aux photos accordé avant l'arrivée des vidéos : les vidéos sont demandées une fois.
+    var askedForVideos by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(gallery.hasPermission) {
+        if (gallery.hasPermission && !askedForVideos && MediaPermissions.lacksVideos(context)) {
+            askedForVideos = true
+            requestPermission()
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) openEditor(uri)
@@ -212,11 +227,16 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
             gallery.refresh()
         }
     }
-    val hidePhotos: (List<MediaPhoto>) -> Unit = { photos ->
-        if (!canProtect(context)) {
-            toast("Définissez d'abord un verrouillage de l'écran (code ou empreinte)")
-        } else {
-            scope.launch {
+    val hidePhotos: (List<MediaPhoto>) -> Unit = { selected ->
+        // Le dossier masqué ne prend que des photos : une vidéo, bien plus lourde, n'y entre pas.
+        val photos = selected.filterNot { it.isVideo }
+        if (photos.size < selected.size) {
+            toast(if (photos.isEmpty()) "Les vidéos ne peuvent pas être masquées" else "Les vidéos sélectionnées restent dans la galerie")
+        }
+        when {
+            photos.isEmpty() -> Unit
+            !canProtect(context) -> toast("Définissez d'abord un verrouillage de l'écran (code ou empreinte)")
+            else -> scope.launch {
                 val originals = vault.prepare(photos)
                 if (originals.isEmpty()) {
                     toast("Impossible de masquer ces photos")
@@ -237,10 +257,11 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
     }
 
     val share: (List<Uri>) -> Unit = { uris ->
+        val type = shareType(uris.map { if (VideoFrames.isVideo(it)) "video/*" else "image/*" })
         val intent = if (uris.size == 1) {
-            Intent(Intent.ACTION_SEND).setType("image/*").putExtra(Intent.EXTRA_STREAM, uris.first())
+            Intent(Intent.ACTION_SEND).setType(type).putExtra(Intent.EXTRA_STREAM, uris.first())
         } else {
-            Intent(Intent.ACTION_SEND_MULTIPLE).setType("image/*").putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            Intent(Intent.ACTION_SEND_MULTIPLE).setType(type).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
         }
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         context.startActivity(Intent.createChooser(intent, "Partager"))
@@ -367,7 +388,7 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 similarTo = gallery::similarTo,
                 onOpenPhoto = { navigator.push(Screen.Viewer(MediaRepository.ALL_KEY, it)) },
                 onOpenWith = { uri ->
-                    val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "image/*")
+                    val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, if (VideoFrames.isVideo(uri)) "video/*" else "image/*")
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     context.startActivity(Intent.createChooser(intent, "Ouvrir avec"))
                 },

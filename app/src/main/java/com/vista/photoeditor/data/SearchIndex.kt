@@ -1,7 +1,6 @@
 package com.vista.photoeditor.data
 
 import android.content.Context
-import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
@@ -85,7 +84,7 @@ class SearchIndex private constructor(private val context: Context) {
             for (photo in missing) {
                 currentCoroutineContext().ensureActive()
                 // Une photo illisible reçoit un vecteur vide : elle n'est pas réanalysée à chaque fois.
-                embeddings[photo.id] = runCatching { analyse(photo.uri) }.getOrNull() ?: FloatArray(0)
+                embeddings[photo.id] = runCatching { analyse(photo) }.getOrNull() ?: FloatArray(0)
                 categoryCache.remove(photo.id)
                 conceptCache.remove(photo.id)
                 indexed++
@@ -163,9 +162,13 @@ class SearchIndex private constructor(private val context: Context) {
         return clip.concepts.describe(embedding).also { conceptCache[photoId] = it }
     }
 
-    /** Vecteur d'une photo : décodée à l'endroit (rotation EXIF appliquée), puis résumée. */
-    private suspend fun analyse(uri: Uri): FloatArray {
-        val bitmap = ImageIO.decode(context, uri, ANALYSIS_SIZE)
+    /**
+     * Vecteur d'une photo : décodée à l'endroit (rotation EXIF appliquée), puis résumée. Une vidéo
+     * est résumée par son image représentative : elle entre dans les catégories et la recherche.
+     */
+    private suspend fun analyse(photo: MediaPhoto): FloatArray {
+        val bitmap = if (photo.isVideo) VideoFrames.poster(context, photo.uri, ANALYSIS_SIZE)
+        else ImageIO.decode(context, photo.uri, ANALYSIS_SIZE)
         // Calcul lourd : hors du fil de l'interface.
         return withContext(Dispatchers.Default) { clip.embed(bitmap) }
     }

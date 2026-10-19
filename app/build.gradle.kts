@@ -86,6 +86,8 @@ dependencies {
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
     // Analyse de toute la galerie pendant la recharge.
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // Lecture des vidéos dans la visionneuse.
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
 
     testImplementation("junit:junit:4.13.2")
 }
