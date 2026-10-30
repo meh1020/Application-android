@@ -3,22 +3,17 @@ package com.vista.photoeditor.ui.components
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -53,30 +48,23 @@ fun PhotoImage(
 }
 
 /**
- * Durée posée sur la vignette d'une vidéo, comme dans Photos sur iOS : c'est ce qui la distingue
- * d'une photo dans la grille.
+ * Durée posée sur la vignette d'une vidéo, comme dans Photos sur iPhone : en blanc dans le coin,
+ * sans pastille, avec une ombre douce qui la garde lisible sur une image claire.
  */
 @Composable
 fun VideoBadge(durationMillis: Long, modifier: Modifier = Modifier, padding: Dp = 8.dp) {
-    Row(
-        modifier
+    Text(
+        DateLabels.duration(durationMillis),
+        color = Color.White,
+        fontFamily = Kanit,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        maxLines = 1,
+        style = TextStyle(shadow = Shadow(Color.Black.copy(alpha = 0.6f), Offset(0f, 1f), blurRadius = 6f)),
+        modifier = modifier
             .padding(padding)
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.42f))
-            .padding(start = 5.dp, end = 8.dp, top = 3.dp, bottom = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Filled.PlayArrow, contentDescription = "Vidéo", tint = Color.White, modifier = Modifier.size(13.dp))
-        Spacer(Modifier.width(2.dp))
-        Text(
-            DateLabels.duration(durationMillis),
-            color = Color.White,
-            fontFamily = Kanit,
-            fontWeight = FontWeight.Medium,
-            fontSize = 11.sp,
-            maxLines = 1,
-        )
-    }
+            .semantics { contentDescription = "Vidéo, " + DateLabels.duration(durationMillis) },
+    )
 }
 
 object DateLabels {

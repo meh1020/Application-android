@@ -3,7 +3,6 @@ package com.vista.photoeditor.ui.viewer
 import androidx.compose.runtime.produceState
 import androidx.compose.foundation.lazy.items
 import android.app.Activity
-import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -51,6 +50,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.VolumeOff
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -69,8 +73,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -129,9 +133,6 @@ private const val MAX_ZOOM = 5f
 private const val DOUBLE_TAP_ZOOM = 2.5f
 private const val DOUBLE_TAP_DELAY_MS = 280L
 
-/** Pendant la lecture d'une vidéo, délai sans toucher avant que les commandes s'effacent. */
-private const val CONTROLS_HIDE_DELAY_MS = 3_000L
-
 private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
 
 private enum class Gesture { UNDECIDED, PAGER, DISMISS, TRANSFORM }
@@ -183,27 +184,14 @@ fun ViewerScreen(
     // App en arrière-plan : la vidéo attend qu'on revienne.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { playback.pause() }
 
-    // Comme dans un lecteur vidéo : pendant la lecture, les commandes s'effacent au bout de
-    // quelques secondes sans toucher l'écran ; une tape les fait revenir.
-    var interactions by remember { mutableIntStateOf(0) }
-    LaunchedEffect(current.id, playback.isPlaying, playback.isScrubbing, immersive, interactions) {
-        if (current.isVideo && playback.isPlaying && !playback.isScrubbing && !immersive) {
-            delay(CONTROLS_HIDE_DELAY_MS)
-            immersive = true
-        }
-    }
+    // Comme dans Photos sur iPhone, les commandes restent affichées pendant la lecture : une
+    // tape sur la vidéo les masque (fond noir) ou les fait revenir.
     // Vidéo finie : les commandes reviennent pour la relancer.
     LaunchedEffect(playback.isEnded) { if (playback.isEnded) immersive = false }
 
-    // Plein écran paysage à la demande ; l'app reprend son orientation libre en quittant la vidéo.
+    // Le téléphone tourné, la vidéo passe en paysage d'elle-même, comme sur iPhone.
     val activity = LocalContext.current as? Activity
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    LaunchedEffect(current.isVideo) {
-        if (!current.isVideo) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-    }
-    DisposableEffect(activity) {
-        onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
-    }
 
     // Vidéo en plein écran (commandes masquées, ou paysage) : les barres du système s'effacent
     // aussi ; un glissé depuis le bord les fait réapparaître un instant.
@@ -235,8 +223,8 @@ fun ViewerScreen(
     }
 
     val chromeVisible = !immersive && !dismissing
-    // Une vidéo se regarde sur fond noir, comme dans un lecteur ; une photo, seulement en plein écran.
-    val blackout = animateFloatAsState(if (immersive || current.isVideo) 1f else 0f, tween(280), label = "blackout")
+    // Comme dans Photos sur iPhone, photo ou vidéo : fond noir seulement en plein écran.
+    val blackout = animateFloatAsState(if (immersive) 1f else 0f, tween(280), label = "blackout")
 
     // Façon Liquid Glass : la photo occupe tout l'écran, les barres de verre flottent par-dessus.
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -300,27 +288,37 @@ fun ViewerScreen(
                     backIcon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                     titleInGlass = true,
                     trailing = {
-                        Box {
-                            CircleIconButton(Icons.Outlined.MoreVert, "Plus d'options", { menu = true })
-                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(if (current.isFavorite) "Retirer des favoris" else "Ajouter aux favoris", fontFamily = Kanit) },
-                                    onClick = { menu = false; onToggleFavorite(current) },
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            // Son de la vidéo, en haut à droite comme sur iPhone.
+                            if (current.isVideo) {
+                                CircleIconButton(
+                                    if (playback.isMuted) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Outlined.VolumeUp,
+                                    if (playback.isMuted) "Activer le son" else "Couper le son",
+                                    { playback.toggleMute() },
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("Ouvrir avec…", fontFamily = Kanit) },
-                                    onClick = { menu = false; onOpenWith(current.uri) },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Photos similaires", fontFamily = Kanit) },
-                                    onClick = { menu = false; showInfo = true },
-                                )
-                                // Le dossier masqué ne prend que des photos.
-                                if (!current.isVideo) {
+                            }
+                            Box {
+                                CircleIconButton(Icons.Outlined.MoreVert, "Plus d'options", { menu = true })
+                                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                     DropdownMenuItem(
-                                        text = { Text("Masquer", fontFamily = Kanit) },
-                                        onClick = { menu = false; onHide(current) },
+                                        text = { Text(if (current.isFavorite) "Retirer des favoris" else "Ajouter aux favoris", fontFamily = Kanit) },
+                                        onClick = { menu = false; onToggleFavorite(current) },
                                     )
+                                    DropdownMenuItem(
+                                        text = { Text("Ouvrir avec…", fontFamily = Kanit) },
+                                        onClick = { menu = false; onOpenWith(current.uri) },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Photos similaires", fontFamily = Kanit) },
+                                        onClick = { menu = false; showInfo = true },
+                                    )
+                                    // Le dossier masqué ne prend que des photos.
+                                    if (!current.isVideo) {
+                                        DropdownMenuItem(
+                                            text = { Text("Masquer", fontFamily = Kanit) },
+                                            onClick = { menu = false; onHide(current) },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -329,41 +327,8 @@ fun ViewerScreen(
             }
         }
 
-        // Vidéo : lecteur classique, bouton de lecture au centre et commandes en bas, sur fond noir.
         AnimatedVisibility(
-            visible = chromeVisible && current.isVideo,
-            enter = fadeIn(tween(220)),
-            exit = fadeOut(tween(160)),
-            modifier = Modifier.align(Alignment.Center),
-        ) {
-            VideoCenterControls(playback, onInteract = { interactions++ })
-        }
-        AnimatedVisibility(
-            visible = chromeVisible && current.isVideo,
-            enter = fadeIn(tween(220)),
-            exit = fadeOut(tween(160)),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            VideoControls(
-                playback = playback,
-                isLandscape = isLandscape,
-                onToggleLandscape = {
-                    interactions++
-                    activity?.requestedOrientation = if (isLandscape) {
-                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                    } else {
-                        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    }
-                },
-                onShare = { onShare(current.uri) },
-                onInfo = { showInfo = true },
-                onDelete = { onDelete(current.uri) },
-                onInteract = { interactions++ },
-            )
-        }
-
-        AnimatedVisibility(
-            visible = chromeVisible && !current.isVideo,
+            visible = chromeVisible,
             enter = fadeIn(tween(220)),
             exit = fadeOut(tween(160)),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -376,71 +341,113 @@ fun ViewerScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // Pellicule des miniatures, dans une capsule de verre.
-                GlassSurface(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth()
-                        .height(60.dp),
-                    shape = RoundedCornerShape(30.dp),
-                ) {
-                    LazyRow(
-                        state = rowState,
-                        contentPadding = PaddingValues(horizontal = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxSize(),
+                if (current.isVideo) {
+                    // Vidéo, comme dans Photos sur iPhone : la pellicule de lecture à faire glisser
+                    // prend la place des miniatures, et la barre d'outils met la lecture au centre.
+                    VideoFilmstrip(
+                        playback = playback,
+                        video = current,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    val playing = playback.wantsToPlay && !playback.isEnded
+                    val videoActions = listOf(
+                        GlassBarItem(Icons.Outlined.IosShare, "Partager"),
+                        if (current.isFavorite) GlassBarItem(Icons.Filled.Favorite, "Retirer des favoris")
+                        else GlassBarItem(Icons.Filled.FavoriteBorder, "Ajouter aux favoris"),
+                        if (playing) GlassBarItem(Icons.Filled.Pause, "Pause")
+                        else GlassBarItem(Icons.Filled.PlayArrow, "Lire"),
+                        GlassBarItem(Icons.Outlined.Info, "Informations"),
+                        GlassBarItem(Icons.Outlined.Delete, "Supprimer"),
+                    )
+                    // Une barre à part pour les vidéos : la goutte de verre ne garde pas la
+                    // position choisie sur une photo.
+                    key("videoBar") {
+                        GlassSlidingBar(
+                            items = videoActions,
+                            selectedIndex = null,
+                            highlightIndex = 2,
+                            onSelect = { index ->
+                                when (index) {
+                                    0 -> onShare(current.uri)
+                                    1 -> onToggleFavorite(current)
+                                    2 -> playback.togglePlay()
+                                    3 -> showInfo = true
+                                    4 -> onDelete(current.uri)
+                                }
+                            },
+                            itemWidth = 58.dp,
+                            height = 60.dp,
+                        )
+                    }
+                } else {
+                    // Pellicule des miniatures, dans une capsule de verre.
+                    GlassSurface(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .fillMaxWidth()
+                            .height(60.dp),
+                        shape = RoundedCornerShape(30.dp),
                     ) {
-                        itemsIndexed(photos, key = { _, p -> p.id }) { index, photo ->
-                            val selected = index == pagerState.currentPage
-                            Box(
-                                Modifier
-                                    .size(44.dp)
-                                    .then(if (selected) Modifier.border(2.dp, VistaColors.Primary, CircleShape) else Modifier)
-                                    .padding(if (selected) 3.dp else 0.dp)
-                                    .clip(CircleShape)
-                                    .plainClickable { scope.launch { pagerState.animateScrollToPage(index) } }
-                            ) {
-                                PhotoImage(photo.uri, Modifier.fillMaxSize())
-                                if (photo.isVideo) {
-                                    Icon(
-                                        Icons.Filled.PlayArrow,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier
-                                            .align(Alignment.Center)
-                                            .size(18.dp),
-                                    )
+                        LazyRow(
+                            state = rowState,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            itemsIndexed(photos, key = { _, p -> p.id }) { index, photo ->
+                                val selected = index == pagerState.currentPage
+                                Box(
+                                    Modifier
+                                        .size(44.dp)
+                                        .then(if (selected) Modifier.border(2.dp, VistaColors.Primary, CircleShape) else Modifier)
+                                        .padding(if (selected) 3.dp else 0.dp)
+                                        .clip(CircleShape)
+                                        .plainClickable { scope.launch { pagerState.animateScrollToPage(index) } }
+                                ) {
+                                    PhotoImage(photo.uri, Modifier.fillMaxSize())
+                                    if (photo.isVideo) {
+                                        Icon(
+                                            Icons.Filled.PlayArrow,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .align(Alignment.Center)
+                                                .size(18.dp),
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+                    // Barre d'outils en verre, comme dans Photos sur iOS.
+                    // On peut glisser d'une action à l'autre : l'action sous le doigt part au relâchement.
+                    val actions = remember {
+                        listOf(
+                            GlassBarItem(Icons.Outlined.Edit, "Modifier"),
+                            GlassBarItem(Icons.Outlined.IosShare, "Partager"),
+                            GlassBarItem(Icons.Outlined.Info, "Informations"),
+                            GlassBarItem(Icons.Outlined.Delete, "Supprimer"),
+                        )
+                    }
+                    key("photoBar") {
+                        GlassSlidingBar(
+                            items = actions,
+                            selectedIndex = null,
+                            highlightIndex = 0,
+                            onSelect = { index ->
+                                when (index) {
+                                    0 -> onEdit(current.uri)
+                                    1 -> onShare(current.uri)
+                                    2 -> showInfo = true
+                                    3 -> onDelete(current.uri)
+                                }
+                            },
+                            itemWidth = 58.dp,
+                            height = 60.dp,
+                        )
+                    }
                 }
-                // Barre d'outils en verre, comme dans Photos sur iOS.
-                // On peut glisser d'une action à l'autre : l'action sous le doigt part au relâchement.
-                val actions = remember {
-                    listOf(
-                        GlassBarItem(Icons.Outlined.Edit, "Modifier"),
-                        GlassBarItem(Icons.Outlined.IosShare, "Partager"),
-                        GlassBarItem(Icons.Outlined.Info, "Informations"),
-                        GlassBarItem(Icons.Outlined.Delete, "Supprimer"),
-                    )
-                }
-                GlassSlidingBar(
-                    items = actions,
-                    selectedIndex = null,
-                    highlightIndex = 0,
-                    onSelect = { index ->
-                        when (index) {
-                            0 -> onEdit(current.uri)
-                            1 -> onShare(current.uri)
-                            2 -> showInfo = true
-                            3 -> onDelete(current.uri)
-                        }
-                    },
-                    itemWidth = 58.dp,
-                    height = 60.dp,
-                )
             }
         }
     }

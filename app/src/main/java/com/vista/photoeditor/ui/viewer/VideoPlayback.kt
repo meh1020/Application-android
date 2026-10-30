@@ -4,38 +4,27 @@ import android.content.Context
 import android.net.Uri
 import android.view.TextureView
 import androidx.annotation.OptIn
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.VolumeOff
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
-import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Replay10
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Fullscreen
-import androidx.compose.material.icons.outlined.FullscreenExit
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.IosShare
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -44,6 +33,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,21 +41,19 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,22 +68,21 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import com.vista.photoeditor.data.MediaPhoto
+import com.vista.photoeditor.data.VideoFrames
 import com.vista.photoeditor.ui.components.DateLabels
-import com.vista.photoeditor.ui.components.plainClickable
+import com.vista.photoeditor.ui.components.GlassSurface
 import com.vista.photoeditor.ui.theme.Kanit
-import com.vista.photoeditor.ui.theme.VistaColors
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-/** Saut des boutons « reculer » et « avancer ». */
-private const val SKIP_MILLIS = 10_000L
-
 /**
- * Lecture des vidéos de la visionneuse, comme dans une galerie : la vidéo affichée démarre
+ * Lecture des vidéos de la visionneuse, comme dans Photos sur iPhone : la vidéo affichée démarre
  * d'elle-même, une seule à la fois ; le son coupé le reste d'une vidéo à l'autre.
  *
  * Le lecteur n'est créé qu'à la première vidéo : parcourir des photos ne coûte rien. L'état
  * (lecture, position, durée) est observable par l'interface ; la position se met à jour à chaque
- * image tant que la vidéo joue (voir [VideoControls]).
+ * image tant que la vidéo joue (voir [VideoFilmstrip]).
  */
 @Stable
 @OptIn(UnstableApi::class)
@@ -319,58 +306,25 @@ fun VideoSurface(playback: VideoPlayback, modifier: Modifier = Modifier) {
     )
 }
 
-/**
- * Commandes du milieu de l'écran, comme dans un lecteur vidéo : reculer de 10 s, lecture ou
- * pause (ou « revoir » une fois la vidéo finie), avancer de 10 s.
- */
-@Composable
-fun VideoCenterControls(playback: VideoPlayback, onInteract: () -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(36.dp), verticalAlignment = Alignment.CenterVertically) {
-        RoundPlayerButton(Icons.Filled.Replay10, "Reculer de 10 secondes", 52.dp, 30.dp) {
-            onInteract()
-            playback.seekBy(-SKIP_MILLIS)
-        }
-        val playing = playback.wantsToPlay && !playback.isEnded
-        RoundPlayerButton(
-            icon = when {
-                playback.isEnded -> Icons.Filled.Replay
-                playing -> Icons.Filled.Pause
-                else -> Icons.Filled.PlayArrow
-            },
-            description = when {
-                playback.isEnded -> "Revoir"
-                playing -> "Pause"
-                else -> "Lire"
-            },
-            size = 76.dp,
-            iconSize = 44.dp,
-        ) {
-            onInteract()
-            playback.togglePlay()
-        }
-        RoundPlayerButton(Icons.Filled.Forward10, "Avancer de 10 secondes", 52.dp, 30.dp) {
-            onInteract()
-            playback.seekBy(SKIP_MILLIS)
-        }
-    }
-}
+
+/** Hauteur des images de la pellicule de lecture. */
+private val FILMSTRIP_HEIGHT = 40.dp
 
 /**
- * Commandes du bas, sur un dégradé sombre : temps écoulé, barre de progression à faire glisser,
- * durée totale ; puis le son, les actions sur la vidéo et le plein écran paysage.
+ * Pellicule de lecture, comme dans Photos sur iPhone : les images de la vidéo défilent sous un
+ * repère blanc fixe, au centre. Glisser la pellicule déplace la lecture (la vidéo suit le doigt,
+ * et le temps s'affiche au-dessus) ; au relâchement, la lecture reprend si elle était en cours.
+ *
+ * Elle prend la place de la rangée de miniatures, dans la même capsule de verre. Sa position est
+ * lue au placement seulement : son défilement pendant la lecture ne recompose rien.
  */
 @Composable
-fun VideoControls(
+fun VideoFilmstrip(
     playback: VideoPlayback,
-    isLandscape: Boolean,
-    onToggleLandscape: () -> Unit,
-    onShare: () -> Unit,
-    onInfo: () -> Unit,
-    onDelete: () -> Unit,
-    onInteract: () -> Unit,
+    video: MediaPhoto,
     modifier: Modifier = Modifier,
 ) {
-    // Position relevée à chaque image tant que la vidéo joue : la barre avance en continu.
+    // Position relevée à chaque image tant que la vidéo joue : la pellicule défile en continu.
     LaunchedEffect(playback, playback.isPlaying) {
         while (playback.isPlaying) {
             withFrameMillis { playback.syncPosition() }
@@ -378,144 +332,137 @@ fun VideoControls(
         playback.syncPosition()
     }
 
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val haptics = LocalHapticFeedback.current
+    val ratio = remember(video.id) {
+        ((video.displayWidth.takeIf { it > 0 } ?: 16).toFloat() / (video.displayHeight.takeIf { it > 0 } ?: 9))
+            .coerceIn(0.5f, 1.8f)
+    }
+
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        // Temps écoulé et durée, le temps de chercher un passage.
+        AnimatedVisibility(
+            visible = playback.isScrubbing,
+            enter = fadeIn(tween(120)),
+            exit = fadeOut(tween(200)),
+        ) {
+            ScrubTime(playback, Modifier.padding(bottom = 8.dp))
+        }
+        GlassSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp),
+            shape = RoundedCornerShape(30.dp),
+        ) {
+            BoxWithConstraints(
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                val stripPx = constraints.maxWidth.toFloat()
+                val frameHeightPx = with(density) { FILMSTRIP_HEIGHT.toPx() }
+                // Assez d'images pour couvrir la pellicule sans trou, au format de la vidéo.
+                val count = (stripPx / (frameHeightPx * ratio)).let { ceil(it).toInt() }.coerceIn(4, 30)
+                val frames = remember(video.uri, count) { mutableStateListOf<ImageBitmap?>().apply { repeat(count) { add(null) } } }
+                LaunchedEffect(video.uri, count) {
+                    VideoFrames.filmstrip(context, video.uri, count, frameHeightPx.roundToInt()) { index, frame ->
+                        if (index < frames.size) frames[index] = frame.asImageBitmap()
+                    }
+                }
+
+                // Fenêtre de la pellicule : la vidéo y glisse de droite à gauche pendant la lecture.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(FILMSTRIP_HEIGHT)
+                        .clipToBounds()
+                        .pointerInput(playback, stripPx) {
+                            val slop = viewConfiguration.touchSlop
+                            awaitEachGesture {
+                                val down = awaitFirstDown()
+                                down.consume()
+                                val startFraction = playback.progress
+                                var dragged = 0f
+                                var scrubbing = false
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) break
+                                    dragged += change.position.x - change.previousPosition.x
+                                    if (!scrubbing && abs(dragged) > slop) {
+                                        scrubbing = true
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        playback.beginScrub()
+                                    }
+                                    if (scrubbing) {
+                                        change.consume()
+                                        // Tirer la pellicule vers la gauche avance dans la vidéo.
+                                        playback.scrubTo(startFraction - dragged / stripPx)
+                                    }
+                                }
+                                if (scrubbing) playback.endScrub()
+                            }
+                        },
+                ) {
+                    Row(
+                        Modifier
+                            .offset { IntOffset((stripPx / 2f - playback.progress * stripPx).roundToInt(), 0) }
+                            .width(with(density) { stripPx.toDp() })
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(Color.Black.copy(alpha = 0.35f)),
+                    ) {
+                        frames.forEach { frame ->
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                            ) {
+                                if (frame != null) {
+                                    Image(
+                                        bitmap = frame,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Repère de lecture, fixe au centre, un peu plus haut que la pellicule.
+                Box(
+                    Modifier
+                        .width(4.dp)
+                        .height(FILMSTRIP_HEIGHT + 10.dp)
+                        .shadow(3.dp, RoundedCornerShape(2.dp))
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White)
+                )
+            }
+        }
+    }
+}
+
+/** Temps écoulé et durée, sur une pastille de verre sombre au-dessus de la pellicule. */
+@Composable
+private fun ScrubTime(playback: VideoPlayback, modifier: Modifier = Modifier) {
     // Les temps ne changent qu'à chaque seconde, pas à chaque image.
     val elapsed by remember(playback) { derivedStateOf { DateLabels.duration(playback.positionMillis) } }
     val total by remember(playback) { derivedStateOf { DateLabels.duration(playback.durationMillis) } }
-
-    Column(
-        modifier
-            .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))))
-            .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TimeLabel(elapsed)
-            SeekBar(playback, onInteract, Modifier.weight(1f).padding(horizontal = 10.dp))
-            TimeLabel(total)
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            PlayerIconButton(
-                if (playback.isMuted) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Outlined.VolumeUp,
-                if (playback.isMuted) "Activer le son" else "Couper le son",
-            ) {
-                onInteract()
-                playback.toggleMute()
-            }
-            PlayerIconButton(Icons.Outlined.IosShare, "Partager", onShare)
-            PlayerIconButton(Icons.Outlined.Info, "Informations", onInfo)
-            PlayerIconButton(Icons.Outlined.Delete, "Supprimer", onDelete)
-            PlayerIconButton(
-                if (isLandscape) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen,
-                if (isLandscape) "Quitter le plein écran" else "Plein écran",
-                onToggleLandscape,
-            )
-        }
-    }
-}
-
-/**
- * Barre de progression : toucher ou glisser n'importe où déplace la lecture ; la poignée grossit
- * sous le doigt. La position est lue au dessin seulement : son avance ne recompose rien.
- */
-@Composable
-private fun SeekBar(playback: VideoPlayback, onInteract: () -> Unit, modifier: Modifier = Modifier) {
-    val density = LocalDensity.current
-    val haptics = LocalHapticFeedback.current
-    val thumb by animateDpAsState(if (playback.isScrubbing) 18.dp else 13.dp, label = "seekThumb")
-    BoxWithConstraints(
-        modifier
-            .height(36.dp)
-            .pointerInput(playback) {
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    down.consume()
-                    onInteract()
-                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    playback.beginScrub()
-                    playback.scrubTo(down.position.x / size.width)
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) break
-                        change.consume()
-                        playback.scrubTo(change.position.x / size.width)
-                    }
-                    playback.endScrub()
-                    onInteract()
-                }
-            },
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        val width = constraints.maxWidth.toFloat()
-        val trackHeight = with(density) { 3.dp.toPx() }
-        val played = VistaColors.Primary
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(36.dp)
-                .drawBehind {
-                    val top = (size.height - trackHeight) / 2f
-                    val radius = CornerRadius(trackHeight / 2f)
-                    drawRoundRect(Color.White.copy(alpha = 0.3f), Offset(0f, top), Size(size.width, trackHeight), radius)
-                    drawRoundRect(played, Offset(0f, top), Size(size.width * playback.progress, trackHeight), radius)
-                }
-        )
-        Box(
-            Modifier
-                .offset {
-                    val half = thumb.toPx() / 2f
-                    IntOffset((width * playback.progress - half).roundToInt(), 0)
-                }
-                .size(thumb)
-                .clip(CircleShape)
-                .background(Color.White)
-        )
-    }
-}
-
-@Composable
-private fun TimeLabel(text: String) {
     Text(
-        text,
+        "$elapsed / $total",
         color = Color.White,
         fontFamily = Kanit,
         fontWeight = FontWeight.Medium,
         fontSize = 13.sp,
         maxLines = 1,
-        modifier = Modifier.widthIn(min = 38.dp),
+        modifier = modifier
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.55f))
+            .padding(horizontal = 12.dp, vertical = 5.dp),
     )
-}
-
-@Composable
-private fun PlayerIconButton(icon: ImageVector, description: String, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(46.dp)
-            .clip(CircleShape)
-            .plainClickable(onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(24.dp))
-    }
-}
-
-@Composable
-private fun RoundPlayerButton(icon: ImageVector, description: String, size: Dp, iconSize: Dp, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.45f))
-            .plainClickable(onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(iconSize))
-    }
 }
