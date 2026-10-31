@@ -166,3 +166,47 @@ data class EditState(
         return Cm.concat(adjustments, filter)
     }
 }
+
+/**
+ * Retouche en texte (une ligne « clé=valeur » par réglage), pour la retrouver si Android arrête
+ * l'app pendant l'édition. Volontairement sans dépendance à Android : testable tel quel.
+ */
+fun EditState.encode(): String = buildString {
+    appendLine("filter=$filterId")
+    appendLine("intensity=$filterIntensity")
+    appendLine("turns=$quarterTurns")
+    appendLine("flipH=$flipH")
+    appendLine("flipV=$flipV")
+    appendLine("straighten=$straighten")
+    appendLine("crop=${crop.left},${crop.top},${crop.right},${crop.bottom}")
+    adjustments.forEach { (adjustment, value) -> appendLine("adj.${adjustment.name}=$value") }
+}
+
+/** Retouche relue depuis [encode] ; une valeur absente ou illisible reprend sa valeur par défaut. */
+fun decodeEditState(text: String): EditState {
+    val values = text.lineSequence()
+        .mapNotNull { line -> line.indexOf('=').takeIf { it > 0 }?.let { line.substring(0, it) to line.substring(it + 1) } }
+        .toMap()
+    val default = EditState()
+    val crop = values["crop"]?.split(',')?.mapNotNull { it.toFloatOrNull() }
+        ?.takeIf { it.size == 4 }
+        ?.let { (l, t, r, b) -> NormRect(l, t, r, b) }
+    val adjustments = buildMap<Adjustment, Float> {
+        Adjustment.entries.forEach { adjustment ->
+            values["adj.${adjustment.name}"]?.toFloatOrNull()
+                ?.takeIf { it != 0f }
+                ?.let { put(adjustment, it.coerceIn(adjustment.min, adjustment.max)) }
+        }
+    }
+    return EditState(
+        filterId = values["filter"]?.takeIf { it.isNotEmpty() } ?: default.filterId,
+        filterIntensity = values["intensity"]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: default.filterIntensity,
+        adjustments = adjustments,
+        quarterTurns = values["turns"]?.toIntOrNull()?.mod(4) ?: default.quarterTurns,
+        flipH = values["flipH"]?.toBooleanStrictOrNull() ?: default.flipH,
+        flipV = values["flipV"]?.toBooleanStrictOrNull() ?: default.flipV,
+        straighten = values["straighten"]?.toFloatOrNull()
+            ?.coerceIn(-MAX_STRAIGHTEN_DEGREES, MAX_STRAIGHTEN_DEGREES) ?: default.straighten,
+        crop = crop ?: default.crop,
+    )
+}

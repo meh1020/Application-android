@@ -1,6 +1,9 @@
 package com.vista.photoeditor.data
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.os.SystemClock
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
@@ -42,6 +45,9 @@ class SearchIndex private constructor(private val context: Context) {
     /** Photos déjà écrites dans le fichier : seules les nouvelles y sont ajoutées. */
     private val saved = HashSet<Long>()
 
+    /** Photos de l'analyse en cours lues depuis la vignette d'Android (voir [analyse]). */
+    private var fromThumbnails = 0
+
     var indexed by mutableIntStateOf(0)
         private set
     var total by mutableIntStateOf(0)
@@ -80,6 +86,9 @@ class SearchIndex private constructor(private val context: Context) {
         }
 
         var sinceSave = 0
+        val startedAt = SystemClock.elapsedRealtime()
+        val doneBefore = indexed
+        fromThumbnails = 0
         try {
             for (photo in missing) {
                 currentCoroutineContext().ensureActive()
@@ -96,6 +105,7 @@ class SearchIndex private constructor(private val context: Context) {
         } finally {
             // Interrompue (écran quitté, galerie rechargée) : le travail fait n'est pas perdu.
             if (sinceSave > 0) withContext(NonCancellable) { save() }
+            logSpeed(indexed - doneBefore, SystemClock.elapsedRealtime() - startedAt)
         }
         warmUp(scope)
     }
@@ -167,10 +177,40 @@ class SearchIndex private constructor(private val context: Context) {
      * est résumée par son image représentative : elle entre dans les catégories et la recherche.
      */
     private suspend fun analyse(photo: MediaPhoto): FloatArray {
-        val bitmap = if (photo.isVideo) VideoFrames.poster(context, photo.uri, ANALYSIS_SIZE)
-        else ImageIO.decode(context, photo.uri, ANALYSIS_SIZE)
+        val bitmap = when {
+            photo.isVideo -> VideoFrames.poster(context, photo.uri, ANALYSIS_SIZE)
+            else -> thumbnailOf(photo)?.also { fromThumbnails++ } ?: ImageIO.decode(context, photo.uri, ANALYSIS_SIZE)
+        }
         // Calcul lourd : hors du fil de l'interface.
         return withContext(Dispatchers.Default) { clip.embed(bitmap) }
+    }
+
+    /**
+     * Vignette qu'Android garde pour la photo, si elle suffit à MobileCLIP (petit côté d'au moins
+     * 256 px) : bien plus rapide à lire que le fichier complet. Mesuré sur les 32 photos de
+     * l'émulateur, le vecteur obtenu reste à au moins 0,99 de celui du fichier complet (seuil des
+     * doublons : 0,98) : les photos déjà analysées n'ont pas à l'être de nouveau.
+     */
+    private suspend fun thumbnailOf(photo: MediaPhoto): Bitmap? {
+        val thumbnail = MediaThumbnails.load(context, photo.uri, ANALYSIS_SIZE, MIN_ANALYSIS_SIDE, software = true)
+            ?: return null
+        // Orientation différente de celle de la photo (vignette pas redressée) : le fichier complet,
+        // que le décodeur redresse toujours.
+        if (!MediaThumbnails.sameOrientation(photo.displayWidth, photo.displayHeight, thumbnail.width, thumbnail.height)) {
+            thumbnail.recycle()
+            return null
+        }
+        return thumbnail
+    }
+
+    /** Vitesse de l'analyse, à lire avec `adb logcat -s VistaPerf` (ou dans Logcat d'Android Studio). */
+    private fun logSpeed(count: Int, millis: Long) {
+        if (count <= 0) return
+        Log.i(
+            PERF_TAG,
+            "Analyse : $count photos en ${"%.1f".format(millis / 1000f)} s " +
+                "(${millis / count} ms par photo), $fromThumbnails depuis la vignette d'Android",
+        )
     }
 
     private suspend fun load() {
@@ -300,6 +340,11 @@ class SearchIndex private constructor(private val context: Context) {
 
         /** Assez grand pour que le bord court dépasse 256 px, la taille d'entrée de MobileCLIP. */
         private const val ANALYSIS_SIZE = 512
+
+        /** Taille d'entrée de MobileCLIP : une vignette plus petite serait agrandie, donc floue. */
+        private const val MIN_ANALYSIS_SIDE = 256
+
+        private const val PERF_TAG = "VistaPerf"
 
         /** Une seule lettre désignerait la moitié du vocabulaire. */
         private const val MIN_QUERY_LENGTH = 2

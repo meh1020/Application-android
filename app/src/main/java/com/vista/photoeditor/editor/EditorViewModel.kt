@@ -8,7 +8,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import android.os.Bundle
+import androidx.core.os.BundleCompat
+import androidx.core.os.bundleOf
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +20,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class EditorViewModel(application: Application) : AndroidViewModel(application) {
+/**
+ * Édition en cours. Photo, retouche et cadrage choisi sont sauvegardés avec l'écran : si Android
+ * arrête l'app en arrière-plan (passage par une autre app), la retouche est retrouvée au retour.
+ */
+class EditorViewModel(application: Application, private val saved: SavedStateHandle) : AndroidViewModel(application) {
 
     var sourceUri by mutableStateOf<Uri?>(null)
         private set
@@ -99,9 +107,33 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private var requestedGeometry: Geometry? = null
     private var transformedFor: Geometry? = null
 
-    fun open(uri: Uri) {
+    init {
+        // Lue seulement au moment où Android sauvegarde l'écran : rien à faire pendant les glissements.
+        saved.setSavedStateProvider(KEY_SESSION) { sessionBundle() }
+        restoreSession()
+    }
+
+    fun open(uri: Uri) = load(uri, EditState())
+
+    /**
+     * Ouvre [uri] avec la retouche [initial] déjà posée (reprise après un arrêt de l'app) ;
+     * « annuler » ramène alors à la photo d'origine.
+     */
+    private fun load(
+        uri: Uri,
+        initial: EditState,
+        initialAspect: AspectRatio = AspectRatio.FREE,
+        aspectLocked: Boolean = false,
+    ) {
         close()
         sourceUri = uri
+        if (initial != state) {
+            state = initial
+            history.add(initial)
+            historyIndex = history.lastIndex
+        }
+        aspect = initialAspect
+        isAspectLocked = aspectLocked
         loadJob = viewModelScope.launch {
             try {
                 original = ImageIO.decode(getApplication(), uri, PREVIEW_MAX_SIDE)
@@ -347,7 +379,36 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** Ce qui permet de reprendre l'édition : vide quand aucune photo n'est ouverte. */
+    private fun sessionBundle(): Bundle {
+        val uri = sourceUri ?: return Bundle()
+        return bundleOf(
+            KEY_URI to uri,
+            KEY_STATE to state.encode(),
+            KEY_ASPECT to aspect.name,
+            KEY_ASPECT_LOCKED to isAspectLocked,
+        )
+    }
+
+    /**
+     * Reprend l'édition sauvegardée, s'il y en a une. Si la photo n'est plus lisible (accès accordé
+     * par une autre app, perdu à l'arrêt), l'ouverture échoue comme d'habitude et l'éditeur se ferme.
+     */
+    private fun restoreSession() {
+        val session = saved.get<Bundle>(KEY_SESSION) ?: return
+        val uri = BundleCompat.getParcelable(session, KEY_URI, Uri::class.java) ?: return
+        val restored = session.getString(KEY_STATE)?.let(::decodeEditState) ?: EditState()
+        val ratio = AspectRatio.entries.firstOrNull { it.name == session.getString(KEY_ASPECT) } ?: AspectRatio.FREE
+        load(uri, restored, ratio, session.getBoolean(KEY_ASPECT_LOCKED))
+    }
+
     private companion object {
+        const val KEY_SESSION = "editor_session"
+        const val KEY_URI = "uri"
+        const val KEY_STATE = "state"
+        const val KEY_ASPECT = "aspect"
+        const val KEY_ASPECT_LOCKED = "aspect_locked"
+
         const val PREVIEW_MAX_SIDE = 1600
         const val EXPORT_MAX_SIDE = 4096
         const val THUMBNAIL_SIZE = 180

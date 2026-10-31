@@ -82,7 +82,8 @@ fun SearchScreen(
     }
     // Calculés hors du fil de l'interface : comparer des milliers de photos au vocabulaire ne doit
     // pas figer la saisie.
-    val photos by produceState(gallery.photos.take(60), q, gallery.photos, index.version) {
+    val categories = gallery.categories
+    val photos by produceState(gallery.photos.take(60), q, gallery.photos, index.version, categories) {
         value = if (q.isEmpty()) gallery.photos.take(60) else withContext(Dispatchers.Default) {
             // « plage 2023 », « chien juillet » : les mots de date filtrent, le reste se cherche.
             val query = SearchQuery.parse(q)
@@ -99,7 +100,7 @@ fun SearchScreen(
             // Puis les photos de la catégorie d'Explorer que désigne la recherche (« livre » →
             // « Livres & lecture ») : la recherche retrouve au moins ce qu'Explorer montre, retraits
             // manuels compris.
-            val byCategory = gallery.categories()
+            val byCategory = categories
                 .filter { PhotoLabels.isMainSubject(it.name, t) }
                 .flatMap { it.photos }
                 .filter { query.matchesDate(it.dateMillis) && seen.add(it.id) }

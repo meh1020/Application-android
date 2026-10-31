@@ -1,8 +1,12 @@
 package com.vista.photoeditor.data
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 
 /**
  * Albums construits tout seuls à partir de ce que l'analyse embarquée a compris des photos.
@@ -127,16 +131,19 @@ object SmartAlbums {
         return memoryNames[best.key]
     }
 
-    /** Nombre d'années entières si la date tombe sur l'anniversaire du jour, sinon null. */
-    private fun yearsAgo(dateMillis: Long, now: Long): Int? {
-        val then = Calendar.getInstance().apply { timeInMillis = dateMillis }
-        val today = Calendar.getInstance().apply { timeInMillis = now }
-        val years = today.get(Calendar.YEAR) - then.get(Calendar.YEAR)
-        if (years < 1) return null
-        // Même jour de l'année, à quelques jours près, en tenant compte du passage d'année.
-        val dayGap = kotlin.math.abs(today.get(Calendar.DAY_OF_YEAR) - then.get(Calendar.DAY_OF_YEAR))
-        val gap = minOf(dayGap, 365 - dayGap)
-        return if (gap <= ANNIVERSARY_WINDOW_DAYS) years else null
+    /**
+     * Nombre d'années si la date tombe, à [ANNIVERSARY_WINDOW_DAYS] jours près, sur son anniversaire
+     * (passé ou tout proche), sinon null. Les années se comptent en anniversaires réels, pas en
+     * numéros d'année : le 1er janvier, une photo du 30 décembre précédent n'a pas un an.
+     */
+    internal fun yearsAgo(dateMillis: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): Int? {
+        val then = Instant.ofEpochMilli(dateMillis).atZone(zone).toLocalDate()
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        // Anniversaires entiers déjà passés ; le suivant compte aussi s'il tombe dans quelques jours.
+        val full = ChronoUnit.YEARS.between(then, today).toInt()
+        return listOf(full, full + 1).firstOrNull { years ->
+            years >= 1 && abs(ChronoUnit.DAYS.between(then.plusYears(years.toLong()), today)) <= ANNIVERSARY_WINDOW_DAYS
+        }
     }
 
     private fun dateRange(group: List<MediaPhoto>): String {

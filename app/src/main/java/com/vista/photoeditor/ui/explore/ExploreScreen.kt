@@ -33,7 +33,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,9 +68,10 @@ fun ExploreScreen(
     // L'analyse démarre à l'ouverture et reprend là où elle s'était arrêtée.
     LaunchedEffect(gallery.photos) { index.ensureIndexed(gallery.photos) }
 
-    // Recalculés à chaque lot analysé : les rayons se remplissent sous les yeux.
-    val memories = remember(gallery.photos, index.version) { gallery.memories() }
-    val categories = remember(gallery.photos, index.version, gallery.corrections.version) { gallery.categories() }
+    // Recalculés en arrière-plan à chaque lot analysé : les rayons se remplissent sous les yeux,
+    // sans figer l'écran.
+    val memories = gallery.memories
+    val categories = gallery.categories
     val duplicates by produceState(emptyList<List<MediaPhoto>>(), gallery.photos, index.version) {
         value = gallery.duplicates()
     }

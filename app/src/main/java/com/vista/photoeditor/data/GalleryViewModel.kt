@@ -7,12 +7,14 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vista.photoeditor.editor.ImageIO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
@@ -30,6 +32,29 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     var albums by mutableStateOf<List<Album>>(emptyList())
         private set
     var trashed by mutableStateOf<List<MediaPhoto>>(emptyList())
+        private set
+
+    /** Vrai une fois la galerie lue au moins une fois : avant, des listes vides ne veulent rien dire. */
+    var isLoaded by mutableStateOf(false)
+        private set
+
+    /**
+     * Rayons remplis tout seuls d'après ce que l'IA a compris des photos (Personnes, Plages…).
+     * Calculés en arrière-plan à chaque changement de la galerie, de l'analyse ou des corrections
+     * (voir [watchSmartAlbums]) : les écrans n'ont plus qu'à les lire.
+     */
+    var categories by mutableStateOf<List<Album>>(emptyList())
+        private set
+
+    /** Moments regroupés tout seuls, nommés d'après ce qu'on y voit ; calculés comme [categories]. */
+    var memories by mutableStateOf<List<Album>>(emptyList())
+        private set
+
+    /**
+     * Galerie lue et rayons automatiques calculés d'après elle : un album retrouvé par sa clé
+     * (« cat:… », « mem:… ») existe bel et bien. Une fois vrai, le reste.
+     */
+    var isReady by mutableStateOf(false)
         private set
 
     /** Index de la recherche par contenu, alimenté à la demande depuis l'écran Recherche. */
@@ -52,8 +77,38 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         application.contentResolver.registerContentObserver(MediaRepository.collection, true, observer)
         application.contentResolver.registerContentObserver(MediaRepository.videoCollection, true, observer)
         IndexWorker.schedule(application)
+        watchSmartAlbums()
         refresh()
     }
+
+    /**
+     * Recalcule catégories et souvenirs hors du fil de l'interface : parcourir toute la galerie à
+     * chaque lot analysé (50 photos) figerait sinon l'écran pendant l'analyse. Un calcul dépassé par
+     * un changement plus récent est abandonné au profit du suivant.
+     */
+    private fun watchSmartAlbums() {
+        viewModelScope.launch {
+            snapshotFlow { SmartAlbumsInput(photos, isLoaded, searchIndex.version, corrections.version) }
+                .collectLatest { input ->
+                    val (nextCategories, nextMemories) = withContext(Dispatchers.Default) {
+                        val all = input.photos
+                        SmartAlbums.categories(all, searchIndex::categoriesOf, searchIndex.categoryTitles, corrections::isRemoved) to
+                            SmartAlbums.memories(all, searchIndex::categoriesOf, searchIndex.memoryNames, System.currentTimeMillis())
+                    }
+                    categories = nextCategories
+                    memories = nextMemories
+                    if (input.loaded) isReady = true
+                }
+        }
+    }
+
+    /** Ce dont dépendent catégories et souvenirs : un changement de l'un d'eux les recalcule. */
+    private data class SmartAlbumsInput(
+        val photos: List<MediaPhoto>,
+        val loaded: Boolean,
+        val indexVersion: Int,
+        val correctionsVersion: Int,
+    )
 
     fun onPermissionsChanged() {
         hasPermission = MediaPermissions.hasAccess(getApplication())
@@ -74,6 +129,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
             photos = all
             albums = MediaRepository.buildAlbums(all)
             trashed = bin
+            isLoaded = true
             isLoading = false
             startIndexing(all)
         }
@@ -92,22 +148,11 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    /** Rayons remplis tout seuls d'après ce que l'IA a compris des photos (Personnes, Plages…). */
-    fun categories(): List<Album> {
-        corrections.version // les corrections font partie de ce que les écrans observent
-        return SmartAlbums.categories(photos, searchIndex::categoriesOf, searchIndex.categoryTitles, corrections::isRemoved)
-    }
-
     /** Retire des photos d'une catégorie (clé d'album « cat:… ») ; le classement ne les y remet plus. */
     fun removeFromCategory(albumKey: String, photoIds: List<Long>) {
         if (!albumKey.startsWith(SmartAlbums.CATEGORY_PREFIX)) return
         corrections.remove(albumKey.removePrefix(SmartAlbums.CATEGORY_PREFIX), photoIds)
     }
-
-    /** Moments regroupés tout seuls, nommés d'après ce qu'on y voit. */
-    fun memories(): List<Album> = SmartAlbums.memories(
-        photos, searchIndex::categoriesOf, searchIndex.memoryNames, System.currentTimeMillis(),
-    )
 
     private var duplicatesKey: Pair<List<MediaPhoto>, Int>? = null
     private var duplicatesCache: List<List<MediaPhoto>> = emptyList()
@@ -169,8 +214,8 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
 
     fun album(key: String): Album? = when {
         key == MediaRepository.ALL_KEY -> Album(MediaRepository.ALL_KEY, "Récents", photos)
-        key.startsWith(SmartAlbums.CATEGORY_PREFIX) -> categories().find { it.key == key }
-        key.startsWith(SmartAlbums.MEMORY_PREFIX) -> memories().find { it.key == key }
+        key.startsWith(SmartAlbums.CATEGORY_PREFIX) -> categories.find { it.key == key }
+        key.startsWith(SmartAlbums.MEMORY_PREFIX) -> memories.find { it.key == key }
         else -> albums.find { it.key == key }
     }
 

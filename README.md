@@ -192,6 +192,7 @@ app/src/main/java/com/vista/photoeditor/
 - **Flou optimisé** : le fond flouté de l'accueil part d'une version réduite de l'image (downscale avant BlurMaskFilter).
 - **Lecture d'état lazy** : gestes (drag, pinch, swipe) lisent les valeurs animées uniquement au dessin (`graphicsLayer`), sans déclencher de recomposition.
 - **Lentille Haze conditionnelle** : l'effet de courbure optique est réservé aux grandes surfaces pour limiter le coût GPU.
+- **Vignettes d'Android** : grille, couvertures d'albums et analyse IA lisent la vignette qu'Android garde en cache pour chaque photo (moitié du petit côté de l'écran) au lieu de décoder tout le fichier ; au-delà de cette taille (visionneuse), le fichier complet. Le vecteur MobileCLIP tiré de la vignette reste à au moins 0,99 de celui du fichier complet (32 photos de l'émulateur ; seuil des doublons 0,98). Vitesse de l'analyse : `adb logcat -s VistaPerf`.
 
 ---
 

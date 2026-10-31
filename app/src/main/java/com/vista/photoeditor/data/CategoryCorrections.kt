@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
 /**
@@ -18,7 +19,8 @@ class CategoryCorrections(context: Context) {
 
     private val file = File(context.filesDir, FILE_NAME)
     private val writer = Executors.newSingleThreadExecutor()
-    private val removed: MutableMap<String, MutableSet<Long>> = load()
+    // Modifiée depuis l'interface, lue par le calcul des catégories en arrière-plan : tables concurrentes.
+    private val removed: ConcurrentHashMap<String, MutableSet<Long>> = load()
 
     /** Change à chaque correction : les écrans qui l'observent se remettent à jour. */
     var version by mutableIntStateOf(0)
@@ -29,20 +31,20 @@ class CategoryCorrections(context: Context) {
     /** Retire [photoIds] de [category] (clé de catégorie, « people »). */
     fun remove(category: String, photoIds: Collection<Long>) {
         if (photoIds.isEmpty()) return
-        removed.getOrPut(category) { mutableSetOf() } += photoIds
+        removed.computeIfAbsent(category) { ConcurrentHashMap.newKeySet<Long>() } += photoIds
         version++
         val snapshot = removed.mapValues { it.value.toList() }
         writer.execute { save(snapshot) }
     }
 
-    private fun load(): MutableMap<String, MutableSet<Long>> {
-        val out = mutableMapOf<String, MutableSet<Long>>()
+    private fun load(): ConcurrentHashMap<String, MutableSet<Long>> {
+        val out = ConcurrentHashMap<String, MutableSet<Long>>()
         runCatching {
             if (!file.exists()) return out
             val json = JSONObject(file.readText())
             json.keys().forEach { key ->
                 val array = json.getJSONArray(key)
-                out[key] = MutableList(array.length()) { array.getLong(it) }.toMutableSet()
+                out[key] = ConcurrentHashMap.newKeySet<Long>().apply { repeat(array.length()) { add(array.getLong(it)) } }
             }
         }
         return out

@@ -35,7 +35,14 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -69,6 +76,7 @@ import com.vista.photoeditor.ui.explore.ExploreScreen
 import com.vista.photoeditor.ui.home.HomeScreen
 import com.vista.photoeditor.ui.onboarding.OnboardingScreen
 import com.vista.photoeditor.ui.search.SearchScreen
+import com.vista.photoeditor.ui.theme.VistaColors
 import com.vista.photoeditor.ui.theme.VistaTheme
 import com.vista.photoeditor.ui.trash.TrashScreen
 import com.vista.photoeditor.ui.viewer.ViewerScreen
@@ -295,6 +303,12 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
         }
     }
 
+    // Éditeur sans photo : ouverture impossible (photo illisible, ou accès perdu pendant un arrêt de
+    // l'app) ; on revient à l'écran précédent plutôt que de rester devant un éditeur vide.
+    LaunchedEffect(navigator.current, editor.sourceUri) {
+        if (navigator.current == Screen.Editor && editor.sourceUri == null) navigator.pop()
+    }
+
     BackHandler(enabled = navigator.current != Screen.Home && navigator.current != Screen.Onboarding) {
         navigator.pop()
     }
@@ -358,41 +372,49 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                 }
             )
 
-            is Screen.AlbumDetail -> AlbumScreen(
-                album = gallery.album(screen.albumKey),
-                onBack = { navigator.pop() },
-                onSearch = { navigator.push(Screen.Search) },
-                onOpenPhoto = { navigator.push(Screen.Viewer(screen.albumKey, it)) },
-                onAdd = importPhoto,
-                onShare = share,
-                onDelete = { launchRequest(MediaRepository.trashRequest(context, it, trash = true)) },
-                onHide = hidePhotos,
-                memory = albumMemories.getOrPut(screen.albumKey) { AlbumMemory() },
-                onRemoveFromAlbum = if (screen.albumKey.startsWith(SmartAlbums.CATEGORY_PREFIX)) {
-                    { ids -> gallery.removeFromCategory(screen.albumKey, ids) }
-                } else null,
-                returnToPhotoId = lastViewedPhoto[screen.albumKey],
-                onReturnHandled = { lastViewedPhoto.remove(screen.albumKey) },
-            )
+            // Écran repris après un arrêt de l'app : l'album (catégorie, souvenir…) n'existe qu'une
+            // fois la galerie relue ; la visionneuse, vide, se refermerait d'elle-même entre-temps.
+            is Screen.AlbumDetail, is Screen.Viewer -> if (gallery.hasPermission && !gallery.isReady) {
+                GalleryLoading()
+            } else when (screen) {
+                is Screen.AlbumDetail -> AlbumScreen(
+                    album = gallery.album(screen.albumKey),
+                    onBack = { navigator.pop() },
+                    onSearch = { navigator.push(Screen.Search) },
+                    onOpenPhoto = { navigator.push(Screen.Viewer(screen.albumKey, it)) },
+                    onAdd = importPhoto,
+                    onShare = share,
+                    onDelete = { launchRequest(MediaRepository.trashRequest(context, it, trash = true)) },
+                    onHide = hidePhotos,
+                    memory = albumMemories.getOrPut(screen.albumKey) { AlbumMemory() },
+                    onRemoveFromAlbum = if (screen.albumKey.startsWith(SmartAlbums.CATEGORY_PREFIX)) {
+                        { ids -> gallery.removeFromCategory(screen.albumKey, ids) }
+                    } else null,
+                    returnToPhotoId = lastViewedPhoto[screen.albumKey],
+                    onReturnHandled = { lastViewedPhoto.remove(screen.albumKey) },
+                )
 
-            is Screen.Viewer -> ViewerScreen(
-                photos = gallery.album(screen.albumKey)?.photos.orEmpty(),
-                initialPhotoId = screen.photoId,
-                onPhotoShown = { lastViewedPhoto[screen.albumKey] = it },
-                onBack = { navigator.pop() },
-                onEdit = openEditor,
-                onShare = { share(listOf(it)) },
-                onDelete = { launchRequest(MediaRepository.trashRequest(context, listOf(it), trash = true)) },
-                onToggleFavorite = { launchRequest(MediaRepository.favoriteRequest(context, listOf(it.uri), !it.isFavorite)) },
-                onHide = { hidePhotos(listOf(it)) },
-                similarTo = gallery::similarTo,
-                onOpenPhoto = { navigator.push(Screen.Viewer(MediaRepository.ALL_KEY, it)) },
-                onOpenWith = { uri ->
-                    val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, if (VideoFrames.isVideo(uri)) "video/*" else "image/*")
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    context.startActivity(Intent.createChooser(intent, "Ouvrir avec"))
-                },
-            )
+                is Screen.Viewer -> ViewerScreen(
+                    photos = gallery.album(screen.albumKey)?.photos.orEmpty(),
+                    initialPhotoId = screen.photoId,
+                    onPhotoShown = { lastViewedPhoto[screen.albumKey] = it },
+                    onBack = { navigator.pop() },
+                    onEdit = openEditor,
+                    onShare = { share(listOf(it)) },
+                    onDelete = { launchRequest(MediaRepository.trashRequest(context, listOf(it), trash = true)) },
+                    onToggleFavorite = { launchRequest(MediaRepository.favoriteRequest(context, listOf(it.uri), !it.isFavorite)) },
+                    onHide = { hidePhotos(listOf(it)) },
+                    similarTo = gallery::similarTo,
+                    onOpenPhoto = { navigator.push(Screen.Viewer(MediaRepository.ALL_KEY, it)) },
+                    onOpenWith = { uri ->
+                        val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, if (VideoFrames.isVideo(uri)) "video/*" else "image/*")
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        context.startActivity(Intent.createChooser(intent, "Ouvrir avec"))
+                    },
+                )
+
+                else -> Unit
+            }
 
             Screen.Search -> SearchScreen(
                 gallery = gallery,
@@ -445,5 +467,13 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
         } }
     }
     }
+    }
+}
+
+/** Attente de la galerie, sur le fond des écrans. */
+@Composable
+private fun GalleryLoading() {
+    Box(Modifier.fillMaxSize().background(VistaColors.ScreenGradient), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = VistaColors.Primary, strokeWidth = 2.dp)
     }
 }
