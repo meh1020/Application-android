@@ -9,8 +9,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
+import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.viewModelScope
 import com.vista.photoeditor.editor.ImageIO
+import com.vista.photoeditor.widget.MemoryWidget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -111,7 +113,12 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     )
 
     fun onPermissionsChanged() {
-        hasPermission = MediaPermissions.hasAccess(getApplication())
+        val granted = MediaPermissions.hasAccess(getApplication())
+        // Accès tout juste accordé : le widget, qui invitait à l'accorder, montre ses photos.
+        if (granted && !hasPermission) {
+            viewModelScope.launch { runCatching { MemoryWidget().updateAll(getApplication()) } }
+        }
+        hasPermission = granted
         isPartialAccess = MediaPermissions.isPartial(getApplication())
         refresh()
     }
@@ -215,7 +222,9 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     fun album(key: String): Album? = when {
         key == MediaRepository.ALL_KEY -> Album(MediaRepository.ALL_KEY, "Récents", photos)
         key.startsWith(SmartAlbums.CATEGORY_PREFIX) -> categories.find { it.key == key }
-        key.startsWith(SmartAlbums.MEMORY_PREFIX) -> memories.find { it.key == key }
+        // Souvenir disparu depuis (widget d'hier, photos supprimées) : toute la galerie plutôt qu'un
+        // album vide ; la visionneuse y retrouve la photo touchée.
+        key.startsWith(SmartAlbums.MEMORY_PREFIX) -> memories.find { it.key == key } ?: if (isReady) album(MediaRepository.ALL_KEY) else null
         else -> albums.find { it.key == key }
     }
 

@@ -122,6 +122,18 @@ Mesurée sur les mêmes 676 photos et 57 requêtes que l'ancienne recherche par 
 ### 🗑️ Corbeille
 Photos et vidéos supprimées, avec options **Restaurer** ou **Supprimer définitivement**. Comme « Supprimés récemment » sur iOS, chaque vignette indique les jours restants avant la suppression définitive par Android (en rouge les trois derniers) et la durée des vidéos.
 
+### 🖼️ Widget « Il y a un an »
+Sur l'écran d'accueil du téléphone, une photo d'**il y a un an** (ou deux, trois…), tirée du même
+souvenir anniversaire qu'Explorer met en avant. Toucher le widget ouvre la photo dans son souvenir ;
+le retour mène à la grille du souvenir, puis à l'accueil.
+- **Quelle photo** : d'abord un souvenir anniversaire (à 3 jours près, comme dans Explorer) ; à
+  défaut, une photo prise ce jour-là une année passée, même seule ; à défaut, un souvenir d'au moins
+  une semaine, différent chaque jour. Ni vidéo ni capture d'écran.
+- **Mise à jour** toutes les 3 heures, avec une nouvelle photo du souvenir à chaque fois.
+- **Tailles** : 2 × 2 cases (titre et date) ou plus large (date et nombre de photos).
+- Calculé à partir de la galerie seule, sans l'analyse MobileCLIP : le widget ne charge pas le
+  modèle. Sans accès aux photos, il invite à ouvrir Vista pour l'accorder.
+
 ---
 
 ## 🎨 Design System
@@ -149,6 +161,10 @@ app/src/main/java/com/vista/photoeditor/
 │   ├── ClipModel.kt             MobileCLIP embarqué (ONNX Runtime) et classement par catégorie
 │   ├── SmartAlbums.kt           Catégories et souvenirs
 │   └── SearchIndex.kt           Analyse (mots-clés + vecteurs MobileCLIP), persistance
+├── widget/
+│   ├── MemoryWidget.kt          Widget « Il y a un an » (Glance) et son récepteur
+│   ├── MemoryWidgetPicker.kt    Choix de la photo : anniversaire, ce jour-là, souvenir
+│   └── MemoryWidgetLink.kt      Ouverture de la photo dans son souvenir
 ├── editor/
 │   ├── EditState.kt             État immuable de l'édition (filtres + réglages + géométrie)
 │   ├── EditPresets.kt           Définitions des 13 filtres et des 8 curseurs de réglage
@@ -182,6 +198,7 @@ app/src/main/java/com/vista/photoeditor/
 | `androidx.exifinterface:exifinterface:1.3.7` | Lecture/écriture métadonnées JPEG (date, GPS, appareil) |
 | `com.microsoft.onnxruntime:onnxruntime-android:1.22.0` | Exécution de MobileCLIP (catégories) |
 | `androidx.media3:media3-exoplayer:1.5.1` | Lecture des vidéos dans la visionneuse |
+| `androidx.glance:glance-appwidget:1.1.1` | Widget « Il y a un an » de l'écran d'accueil |
 
 ---
 
@@ -238,7 +255,8 @@ app/src/main/java/com/vista/photoeditor/
 
 - [ ] Synchronisation iCloud / Google Photos
 - [ ] Partage de collections sous forme d'album partagé
-- [ ] Widgets écran d'accueil (photo du jour, album aléatoire)
+- [x] Widget écran d'accueil « Il y a un an »
+- [ ] Autres widgets (photo du jour, album aléatoire)
 - [ ] Moteur de filtres GPU via OpenGL ES / Vulkan
 - [ ] Localisation (EN / FR / AR)
 

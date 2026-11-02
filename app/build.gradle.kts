@@ -88,6 +88,8 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     // Lecture des vidéos dans la visionneuse.
     implementation("androidx.media3:media3-exoplayer:1.5.1")
+    // Widget « Il y a un an » de l'écran d'accueil, écrit en Compose.
+    implementation("androidx.glance:glance-appwidget:1.1.1")
 
     testImplementation("junit:junit:4.13.2")
 }

@@ -1,3 +1,20 @@
 <resources>
     <string name="app_name">Vista</string>
+
+    <!-- Widget « Il y a un an » -->
+    <string name="memory_widget_label">Il y a un an</string>
+    <string name="memory_widget_description">Une photo prise ce jour-là, une année passée</string>
+    <string name="memory_widget_one_year">Il y a un an</string>
+    <plurals name="memory_widget_years">
+        <item quantity="one">Il y a %d an</item>
+        <item quantity="other">Il y a %d ans</item>
+    </plurals>
+    <plurals name="memory_widget_photos">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
+    <string name="memory_widget_memory">Souvenir</string>
+    <string name="memory_widget_empty_title">Pas encore de souvenir</string>
+    <string name="memory_widget_empty_body">Vos photos d\'il y a un an apparaîtront ici</string>
+    <string name="memory_widget_no_access">Touchez pour autoriser l\'accès à vos photos</string>
 </resources>

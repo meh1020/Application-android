@@ -80,6 +80,7 @@ import com.vista.photoeditor.ui.theme.VistaColors
 import com.vista.photoeditor.ui.theme.VistaTheme
 import com.vista.photoeditor.ui.trash.TrashScreen
 import com.vista.photoeditor.ui.viewer.ViewerScreen
+import com.vista.photoeditor.widget.MemoryWidgetLink
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -99,13 +100,19 @@ class MainActivity : ComponentActivity() {
         if (!navigator.isInitialized) {
             val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             val incoming = if (savedInstanceState == null) intent.incomingImage() else null
+            val fromWidget = if (savedInstanceState == null) MemoryWidgetLink.screens(intent) else null
+            val onboarded = prefs.getBoolean(KEY_ONBOARDED, false)
             when {
                 incoming != null -> {
                     navigator.reset(Screen.Home)
                     editor.open(incoming)
                     navigator.push(Screen.Editor)
                 }
-                prefs.getBoolean(KEY_ONBOARDED, false) -> navigator.reset(Screen.Home)
+                fromWidget != null && onboarded -> {
+                    navigator.reset(Screen.Home)
+                    fromWidget.forEach(navigator::push)
+                }
+                onboarded -> navigator.reset(Screen.Home)
                 else -> navigator.reset(Screen.Onboarding)
             }
         }
@@ -116,6 +123,18 @@ class MainActivity : ComponentActivity() {
                 VistaApp(navigator, gallery, editor)
             }
         }
+    }
+
+    /**
+     * Widget touché alors que l'app est déjà ouverte : la photo s'ouvre par-dessus l'écran en cours
+     * (une retouche en cours n'est pas perdue, le retour y ramène).
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val screens = MemoryWidgetLink.screens(intent) ?: return
+        if (navigator.current == Screen.Onboarding) return
+        screens.forEach(navigator::push)
     }
 
     override fun onResume() {
