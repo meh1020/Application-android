@@ -26,7 +26,7 @@ data class MediaPhoto(
     val mimeType: String,
     /** Rotation EXIF en degrés ; MediaStore donne les dimensions avant rotation. */
     val orientation: Int = 0,
-    /** Vidéo plutôt que photo : la visionneuse la lit, l'éditeur et le dossier masqué l'écartent. */
+    /** Vidéo plutôt que photo : la visionneuse la lit, la découpe et le dossier masqué la prennent ; l'éditeur l'écarte. */
     val isVideo: Boolean = false,
     /** Durée d'une vidéo, en millisecondes (0 pour une photo). */
     val durationMillis: Long = 0,

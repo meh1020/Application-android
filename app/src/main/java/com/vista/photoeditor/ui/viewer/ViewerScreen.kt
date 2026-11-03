@@ -148,8 +148,10 @@ fun ViewerScreen(
     onDelete: (Uri) -> Unit,
     onToggleFavorite: (MediaPhoto) -> Unit,
     onOpenWith: (Uri) -> Unit,
-    /** Déplace la photo dans le dossier masqué. */
+    /** Déplace la photo ou la vidéo dans le dossier masqué. */
     onHide: (MediaPhoto) -> Unit,
+    /** Ouvre le découpage (début et fin) de la vidéo affichée. */
+    onTrim: (MediaPhoto) -> Unit = {},
     /** Photos qui ressemblent à celle affichée, pour la rangée « Photos similaires ». */
     similarTo: suspend (MediaPhoto) -> List<MediaPhoto> = { emptyList() },
     onOpenPhoto: (Long) -> Unit = {},
@@ -312,13 +314,16 @@ fun ViewerScreen(
                                         text = { Text("Photos similaires", fontFamily = Kanit) },
                                         onClick = { menu = false; showInfo = true },
                                     )
-                                    // Le dossier masqué ne prend que des photos.
-                                    if (!current.isVideo) {
+                                    if (current.isVideo) {
                                         DropdownMenuItem(
-                                            text = { Text("Masquer", fontFamily = Kanit) },
-                                            onClick = { menu = false; onHide(current) },
+                                            text = { Text("Découper", fontFamily = Kanit) },
+                                            onClick = { menu = false; playback.pause(); onTrim(current) },
                                         )
                                     }
+                                    DropdownMenuItem(
+                                        text = { Text("Masquer", fontFamily = Kanit) },
+                                        onClick = { menu = false; onHide(current) },
+                                    )
                                 }
                             }
                         }

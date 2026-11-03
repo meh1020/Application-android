@@ -224,6 +224,15 @@ class VideoPlayback(private val context: Context) {
         p.seekTo(target)
     }
 
+    /** Va à [millis] précisément (découpage : retour au début de la sélection). */
+    fun seekTo(millis: Long) {
+        val p = player ?: return
+        val target = millis.coerceIn(0, durationMillis.coerceAtLeast(0))
+        positionMillis = target
+        isEnded = false
+        p.seekTo(target)
+    }
+
     fun toggleMute() {
         isMuted = !isMuted
         player?.volume = if (isMuted) 0f else 1f

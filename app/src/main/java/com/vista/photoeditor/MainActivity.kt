@@ -38,7 +38,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import com.vista.photoeditor.ui.theme.Kanit
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,6 +86,7 @@ import com.vista.photoeditor.ui.search.SearchScreen
 import com.vista.photoeditor.ui.theme.VistaColors
 import com.vista.photoeditor.ui.theme.VistaTheme
 import com.vista.photoeditor.ui.trash.TrashScreen
+import com.vista.photoeditor.ui.trim.VideoTrimScreen
 import com.vista.photoeditor.ui.viewer.ViewerScreen
 import com.vista.photoeditor.widget.MemoryWidgetLink
 import kotlinx.coroutines.delay
@@ -168,6 +176,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val PREFS = "vista"
         const val KEY_ONBOARDED = "onboarded"
+        /** Avertissement du premier « Masquer » lu et accepté. */
+        const val KEY_HIDE_WARNED = "hide_warned"
     }
 }
 
@@ -250,28 +260,34 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
     val hideRequest = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         scope.launch {
             val moved = vault.settle()
-            if (moved > 0) toast(if (moved > 1) "$moved photos masquées" else "Photo masquée")
+            if (moved > 0) toast(if (moved > 1) "$moved éléments déplacés dans le dossier masqué" else "Déplacé dans le dossier masqué")
             gallery.refresh()
         }
     }
-    val hidePhotos: (List<MediaPhoto>) -> Unit = { selected ->
-        // Le dossier masqué ne prend que des photos : une vidéo, bien plus lourde, n'y entre pas.
-        val photos = selected.filterNot { it.isVideo }
-        if (photos.size < selected.size) {
-            toast(if (photos.isEmpty()) "Les vidéos ne peuvent pas être masquées" else "Les vidéos sélectionnées restent dans la galerie")
+    val proceedHide: (List<MediaPhoto>) -> Unit = { photos ->
+        // Une longue vidéo prend quelques secondes à chiffrer avant la confirmation du système.
+        if (photos.any { it.isVideo }) toast("Chiffrement en cours…")
+        scope.launch {
+            val originals = vault.prepare(photos)
+            if (originals.isEmpty()) {
+                toast("Impossible de masquer ces photos")
+            } else {
+                val request = MediaRepository.deleteRequest(context, originals)
+                hideRequest.launch(IntentSenderRequest.Builder(request.intentSender).build())
+            }
         }
+    }
+    // Premier « Masquer » : avant d'aller plus loin, dire que ces photos ne survivront pas à une
+    // désinstallation sans sauvegarde. Rien n'est chiffré ni supprimé tant que ce n'est pas accepté.
+    val prefs = remember { context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE) }
+    var hideWarningFor by remember { mutableStateOf<List<MediaPhoto>?>(null) }
+    // Photos et vidéos : les vidéos sont chiffrées par blocs, en flux (voir HiddenVault).
+    val hidePhotos: (List<MediaPhoto>) -> Unit = { photos ->
         when {
             photos.isEmpty() -> Unit
             !canProtect(context) -> toast("Définissez d'abord un verrouillage de l'écran (code ou empreinte)")
-            else -> scope.launch {
-                val originals = vault.prepare(photos)
-                if (originals.isEmpty()) {
-                    toast("Impossible de masquer ces photos")
-                } else {
-                    val request = MediaRepository.deleteRequest(context, originals)
-                    hideRequest.launch(IntentSenderRequest.Builder(request.intentSender).build())
-                }
-            }
+            !prefs.getBoolean(MainActivity.KEY_HIDE_WARNED, false) -> { hideWarningFor = photos }
+            else -> proceedHide(photos)
         }
     }
     val openHidden: () -> Unit = {
@@ -393,7 +409,7 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
 
             // Écran repris après un arrêt de l'app : l'album (catégorie, souvenir…) n'existe qu'une
             // fois la galerie relue ; la visionneuse, vide, se refermerait d'elle-même entre-temps.
-            is Screen.AlbumDetail, is Screen.Viewer -> if (gallery.hasPermission && !gallery.isReady) {
+            is Screen.AlbumDetail, is Screen.Viewer, is Screen.Trim -> if (gallery.hasPermission && !gallery.isReady) {
                 GalleryLoading()
             } else when (screen) {
                 is Screen.AlbumDetail -> AlbumScreen(
@@ -423,6 +439,7 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                     onDelete = { launchRequest(MediaRepository.trashRequest(context, listOf(it), trash = true)) },
                     onToggleFavorite = { launchRequest(MediaRepository.favoriteRequest(context, listOf(it.uri), !it.isFavorite)) },
                     onHide = { hidePhotos(listOf(it)) },
+                    onTrim = { navigator.push(Screen.Trim(it.id)) },
                     similarTo = gallery::similarTo,
                     onOpenPhoto = { navigator.push(Screen.Viewer(MediaRepository.ALL_KEY, it)) },
                     onOpenWith = { uri ->
@@ -430,6 +447,16 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
                             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         context.startActivity(Intent.createChooser(intent, "Ouvrir avec"))
                     },
+                )
+
+                is Screen.Trim -> VideoTrimScreen(
+                    video = gallery.photos.firstOrNull { it.id == screen.photoId && it.isVideo },
+                    onBack = { navigator.pop() },
+                    onSaved = {
+                        toast("Copie enregistrée dans « ${MediaRepository.CREATIONS_NAME} »")
+                        navigator.pop()
+                    },
+                    onMessage = { toast(it) },
                 )
 
                 else -> Unit
@@ -487,6 +514,65 @@ private fun VistaApp(navigator: Navigator, gallery: GalleryViewModel, editor: Ed
     }
     }
     }
+
+    hideWarningFor?.let { photos ->
+        HideWarningDialog(
+            items = photos,
+            onAccept = {
+                hideWarningFor = null
+                prefs.edit().putBoolean(MainActivity.KEY_HIDE_WARNED, true).apply()
+                proceedHide(photos)
+            },
+            onDismiss = { hideWarningFor = null },
+        )
+    }
+}
+
+/** « Cette photo sera chiffrée », « Ces 3 vidéos seront chiffrées », « Ces 4 éléments seront chiffrés ». */
+private fun hideSubject(items: List<MediaPhoto>): String {
+    val n = items.size
+    return when {
+        items.all { !it.isVideo } -> if (n > 1) "Ces $n photos seront chiffrées" else "Cette photo sera chiffrée"
+        items.all { it.isVideo } -> if (n > 1) "Ces $n vidéos seront chiffrées" else "Cette vidéo sera chiffrée"
+        else -> "Ces $n éléments seront chiffrés"
+    }
+}
+
+private fun hideRemoved(items: List<MediaPhoto>): String = when {
+    items.any { it.isVideo } && items.any { !it.isVideo } -> "retirés"
+    items.size > 1 -> "retirées"
+    else -> "retirée"
+}
+
+/**
+ * Affiché une seule fois, au premier « Masquer » : la clé du dossier ne quitte pas ce téléphone,
+ * donc ses photos disparaissent avec l'app, sauf sauvegarde (menu ⋮ du dossier masqué).
+ */
+@Composable
+private fun HideWarningDialog(items: List<MediaPhoto>, onAccept: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.Lock, contentDescription = null, tint = VistaColors.Primary) },
+        title = { Text("Avant de masquer", fontFamily = Kanit) },
+        text = {
+            Text(
+                hideSubject(items) +
+                    " avec une clé que seul ce téléphone possède, puis ${hideRemoved(items)} de la galerie.\n\n" +
+                    "Si vous désinstallez Vista, effacez ses données ou changez de téléphone, la clé disparaît " +
+                    "et tout ce qui est masqué avec elle.\n\n" +
+                    "Pour les garder, faites une sauvegarde chiffrée par mot de passe : Explorer › Dossier masqué › " +
+                    "menu ⋮ › Sauvegarder dans un fichier.",
+                fontFamily = Kanit,
+                color = VistaColors.Muted,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onAccept) { Text("J'ai compris, masquer", fontFamily = Kanit, color = VistaColors.Primary) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler", fontFamily = Kanit) }
+        },
+    )
 }
 
 /** Attente de la galerie, sur le fond des écrans. */

@@ -12,6 +12,8 @@ sealed interface Screen {
     data object Home : Screen
     data class AlbumDetail(val albumKey: String) : Screen
     data class Viewer(val albumKey: String, val photoId: Long) : Screen
+    /** Découpage (début et fin) d'une vidéo de la galerie. */
+    data class Trim(val photoId: Long) : Screen
     data object Editor : Screen
     data object Search : Screen
     data object Explore : Screen
@@ -83,6 +85,7 @@ internal fun encodeScreen(screen: Screen): String = when (screen) {
     is Screen.AlbumDetail -> "album:${screen.albumKey}"
     // L'identifiant d'abord : la clé d'album contient elle-même des « : » (« bucket:42 », « cat:beach »).
     is Screen.Viewer -> "viewer:${screen.photoId}:${screen.albumKey}"
+    is Screen.Trim -> "trim:${screen.photoId}"
     Screen.Editor -> "editor"
     Screen.Search -> "search"
     Screen.Explore -> "explore"
@@ -94,6 +97,7 @@ internal fun encodeScreen(screen: Screen): String = when (screen) {
 /** Écran relu, ou null si le texte n'en désigne aucun. */
 internal fun decodeScreen(code: String): Screen? = when {
     code.startsWith("album:") -> code.removePrefix("album:").takeIf { it.isNotEmpty() }?.let { Screen.AlbumDetail(it) }
+    code.startsWith("trim:") -> code.removePrefix("trim:").toLongOrNull()?.let { Screen.Trim(it) }
     code.startsWith("viewer:") -> {
         val rest = code.removePrefix("viewer:")
         val photoId = rest.substringBefore(':').toLongOrNull()

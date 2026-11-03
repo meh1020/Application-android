@@ -16,3 +16,6 @@ tools/clip/*.npz
 tools/clip/text_cache.json
 tools/clip/variants/
 __pycache__/
+
+# APK copiés à la racine par compiler-release.bat
+*.apk

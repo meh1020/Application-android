@@ -69,7 +69,7 @@ lui coller des étiquettes isolées :
   l'émulateur) ; méthode, chiffres et pistes écartées dans `tools/clip/`.
 
 ### 🔒 Dossier masqué
-Depuis la sélection d'un album ou le menu de la visionneuse, **Masquer** chiffre la photo dans le
+Depuis la sélection d'un album ou le menu de la visionneuse, **Masquer** chiffre la photo ou la vidéo dans le
 stockage privé de l'app puis la retire de la galerie (confirmation du système) : aucune autre app
 ne la voit plus. Le dossier s'ouvre depuis le bas d'Explorer, après l'empreinte ou le code de
 l'appareil ; il se referme dès que l'app passe en arrière-plan, et ni capture d'écran ni aperçu des
@@ -82,12 +82,36 @@ apps récentes ne montrent son contenu.
 - **Restaurer** remet la photo dans son dossier d'origine, à sa date d'origine (écrite dans l'EXIF
   si la photo n'en avait pas). **Supprimer** efface définitivement, après confirmation.
 - Demande un verrouillage d'écran : sans empreinte ni code, le dossier ne s'ouvre pas.
+- **Vidéos** : chiffrées par blocs de 1 Mo (`ChunkedCipher.kt`), chacun lié à sa place et à sa vidéo.
+  Elles entrent, sortent, se sauvegardent et se lisent **en flux** : jamais entières en mémoire ni
+  en clair sur le disque. La lecture (Media3 ExoPlayer) déchiffre à la volée le bloc demandé, ce qui
+  permet de sauter n'importe où ; la vignette et la durée s'affichent dans la grille du dossier.
+- **Sauvegarde chiffrée par mot de passe** : la clé du dossier ne quitte pas le téléphone, donc
+  désinstaller Vista ou effacer ses données efface aussi les photos masquées. Le premier « Masquer »
+  le dit (une seule fois, avant que rien ne soit chiffré), et une carte du dossier compte les photos
+  sans sauvegarde. Menu ⋮ › **Sauvegarder dans un fichier** réunit tout le dossier dans un fichier
+  `.vista` rangé où l'on veut (sélecteur de fichiers d'Android) ; **Récupérer une sauvegarde** le
+  relit après une réinstallation ou sur un autre téléphone, sans doublons. Clé tirée du mot de passe
+  par PBKDF2-HMAC-SHA256 (600 000 itérations, sel aléatoire), AES-256-GCM, chaque bloc lié à sa
+  place dans le fichier ; un fichier coupé garde les photos déjà relues. Format et tests :
+  `data/VaultBackup.kt`, `VaultBackupTest.kt`.
 
 ### 🗂️ Album
 Carte d'en-tête *« Le meilleur de \<mois\> »*, grille en quinconce avec tuiles pré-dimensionnées (zéro reflow), sélection multiple pour partager ou mettre à la corbeille, options de tri.
 
 ### 🔭 Visionneuse
-Carrousel 3D avec photos voisines floutées et décalées en perspective, panneau d'informations (date, lieu, appareil via ExifInterface), favoris, act**Vidéos** : toutes celles du téléphone (appareil photo, WhatsApp, téléchargements…), lues par Media3 ExoPlayer **comme dans Photos sur iPhone**. La vidéo s'affiche comme une photo, sur le même fond, et se lance d'elle-même (une seule à la fois ; elle s'arrête quand on passe à une photo ou que l'app passe en arrière-plan). En bas, la rangée de miniatures laisse place à une **pellicule de lecture** : des images de la vidéo, réparties sur toute sa durée, défilent sous un repère blanc fixe au centre ; la faire glisser déplace la lecture, l'image suit le doigt et le temps (« 0:12 / 1:03 ») s'affiche au-dessus. La barre d'outils en verre devient **Partager · Favori · Lecture/Pause · Informations · Supprimer**, la lecture au centre ; le **son** se coupe d'un bouton en haut à droite (et le reste d'une vidéo à l'autre). Les commandes restent affichées pendant la lecture : une tape les masque et passe sur fond noir, une autre les fait revenir ; tourner le téléphone met la vidéo en paysage. Dans la grille, une vidéo porte sa durée en blanc dans le coin. Zoom, glissade de fermeture et zoom « héros » vers la grille marchent comme pour une photo. Pas encore de retouche ni de dossier masqué pour les vidéos (« Ouvrir avec… » les confie à une autre app). dossier masqué pour les vidéos (« Ouvrir avec… » les confie à une autre app).
+Carrousel 3D avec photos voisines floutées et décalées en perspective, panneau d'informations (date, lieu, appareil via ExifInterface), favoris, actions Modifier · Partager · Informations · Supprimer.
+
+**Vidéos** : toutes celles du téléphone (appareil photo, WhatsApp, téléchargements…), lues par Media3 ExoPlayer **comme dans Photos sur iPhone**. La vidéo s'affiche comme une photo, sur le même fond, et se lance d'elle-même (une seule à la fois ; elle s'arrête quand on passe à une photo ou que l'app passe en arrière-plan). En bas, la rangée de miniatures laisse place à une **pellicule de lecture** : des images de la vidéo, réparties sur toute sa durée, défilent sous un repère blanc fixe au centre ; la faire glisser déplace la lecture, l'image suit le doigt et le temps (« 0:12 / 1:03 ») s'affiche au-dessus. La barre d'outils en verre devient **Partager · Favori · Lecture/Pause · Informations · Supprimer**, la lecture au centre ; le **son** se coupe d'un bouton en haut à droite (et le reste d'une vidéo à l'autre). Les commandes restent affichées pendant la lecture : une tape les masque et passe sur fond noir, une autre les fait revenir ; tourner le téléphone met la vidéo en paysage. Dans la grille, une vidéo porte sa durée en blanc dans le coin. Zoom, glissade de fermeture et zoom « héros » vers la grille marchent comme pour une photo. Menu ⋮ : **Découper** (voir plus bas) et **Masquer**, comme pour une photo ; la retouche (filtres, réglages) reste réservée aux photos.
+
+**Découper une vidéo** (menu ⋮ › Découper) : la pellicule de la vidéo entre deux poignées, début
+et fin, comme dans Photos sur iPhone ; ce qui est écarté s'assombrit, la lecture tourne en boucle
+sur la sélection, et glisser entre les poignées déplace la lecture. **Enregistrer une copie** écrit
+la partie gardée dans un nouveau MP4, rangé dans « Créations Vista » à la date de l'original, qui
+reste intact. Sans réencodage (`VideoTrimmer.kt`, MediaExtractor et MediaMuxer d'Android) : rapide et
+sans perte, mais le début se cale sur l'image complète (image clé) qui précède le point choisi,
+souvent moins d'une seconde avant. Formats des appareils photo de téléphone (H.264, H.265, AAC) ;
+les autres sont refusés avec un message.
 
 **Photos similaires** (menu ⋮ ou panneau d'informations) : jusqu'à 12 photos qui ressemblent à celle affichée, d'après les vecteurs MobileCLIP, sans calcul supplémentaire. Seuil 0,55, réglé sur les 730 photos de test : 5 voisines par photo en moyenne, dont 84 % du même sujet.
 
